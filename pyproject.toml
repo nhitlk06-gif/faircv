@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "faircv"
+version = "1.0.0"
+description = "Multi-modal fair recruitment scoring with XAI fairness explanations"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+app = [
+    "streamlit>=1.32",
+    "sentence-transformers>=2.7",
+]
+full = [
+    "streamlit>=1.32",
+    "sentence-transformers>=2.7",
+    "shap>=0.44",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

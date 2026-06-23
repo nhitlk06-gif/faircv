@@ -1,23 +1,23 @@
 """
 app/streamlit_app.py
 --------------------
-FairCV -- Giao dien chinh Streamlit cho he thong sang loc CV cong bang.
+FairCV -- Main Streamlit interface for the fair CV screening system.
 
-Hai vai tro chia se cung mot phien lam viec (session):
+Two roles share the same session:
 
-  Recruiter (Nha tuyen dung)
-      1. Nhap vi tri tuyen dung, mo ta yeu cau cong viec.
-      2. Dat trong so uu tien cho tung tieu chi (slider real-time).
-      3. Upload goi ho so .zip (nhieu CV text/PDF trong mot file).
-      4. Chon mo hinh AI: Logistic Regression hoac MLP.
-      5. Xem bang xep hang Top 10/5/3/1, bieu do SHAP, fairness audit.
+  Recruiter
+      1. Enter job position title and requirements.
+      2. Set priority weights for each criterion (real-time sliders).
+      3. Upload multiple candidate CVs as individual PDF files (>= 1, no ZIP).
+      4. Choose AI model: Logistic Regression or MLP.
+      5. View ranked results Top 10/5/3/1, SHAP charts, fairness audit.
 
-  Candidate (Ung vien)
-      1. Nhap vi tri muon ung tuyen.
-      2. Upload CV ca nhan (file PDF).
-      3. Xem diem ca nhan, profile nang luc, fairness report card.
+  Candidate
+      1. Enter the target position they are applying for.
+      2. Upload their own CV as a single PDF file.
+      3. View personal score, competency profile, and fairness report card.
 
-Chay ung dung:
+Run:
     streamlit run app/streamlit_app.py
 """
 from __future__ import annotations
@@ -38,7 +38,10 @@ import streamlit as st
 
 matplotlib.use("Agg")
 
-# -- Them duong dan src vao sys.path de import package faircv -------------
+# ---------------------------------------------------------------------------
+# Path setup -- add src/ to sys.path so faircv package can be imported
+# ---------------------------------------------------------------------------
+
 _APP_DIR  = os.path.dirname(os.path.abspath(__file__))
 _ROOT_DIR = os.path.dirname(_APP_DIR)
 sys.path.insert(0, os.path.join(_ROOT_DIR, "src"))
@@ -46,13 +49,11 @@ sys.path.insert(0, os.path.join(_ROOT_DIR, "src"))
 from faircv.data import (
     COMPETENCY, COMP_NAMES,
     GENDER_LABELS, ETH_LABELS,
-    extract_cvs_from_zip,      # Giai nen ZIP trong RAM
-    _cached_load_faircv_dataset as load_dataset,  # Co cache Streamlit
     GOOGLE_DRIVE_FILE_ID, LOCAL_CSV_PATH,
 )
 
 # ---------------------------------------------------------------------------
-# Cau hinh trang
+# Page configuration
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
@@ -63,19 +64,19 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Design tokens (mau sac nhat quan)
+# Design tokens
 # ---------------------------------------------------------------------------
 
-INK  = "#1b2330"   # Mau chu chinh
-COMP = "#2E86AB"   # Xanh duong -- tieu chi nang luc
-GOOD = "#2E9E5B"   # Xanh la -- tot / dat
-WARN = "#E0A100"   # Vang -- can xem xet
-BAD  = "#C2384A"   # Do -- khong dat / bias
-PRXY = "#E4572E"   # Cam -- proxy / canh bao
-MUT  = "#7a869a"   # Xam -- thu yeu
+INK  = "#1b2330"   # Primary text
+COMP = "#2E86AB"   # Blue -- competency / neutral
+GOOD = "#2E9E5B"   # Green -- strong / pass
+WARN = "#E0A100"   # Amber -- moderate / review
+BAD  = "#C2384A"   # Red -- weak / fail / bias
+PRXY = "#E4572E"   # Orange -- proxy / alert
+MUT  = "#7a869a"   # Grey -- muted / secondary
 
 # ---------------------------------------------------------------------------
-# CSS noi trang
+# CSS
 # ---------------------------------------------------------------------------
 
 st.markdown(f"""
@@ -84,33 +85,33 @@ st.markdown(f"""
   --ink:{INK}; --comp:{COMP}; --good:{GOOD};
   --bad:{BAD}; --warn:{WARN}; --proxy:{PRXY};
 }}
-.block-container {{ padding-top:1rem; max-width:1260px; }}
+.block-container {{ padding-top:1rem; max-width:1280px; }}
 
 /* Hero banner */
 .hero {{
   background: linear-gradient(110deg,#101826 0%,#1f3550 55%,{COMP} 130%);
-  color:#fff; padding:20px 26px; border-radius:14px;
-  margin-bottom:12px; box-shadow:0 6px 22px rgba(16,24,38,.18);
+  color:#fff; padding:20px 28px; border-radius:14px;
+  margin-bottom:14px; box-shadow:0 6px 24px rgba(16,24,38,.18);
 }}
-.hero h1 {{ margin:0; font-size:1.48rem; }}
-.hero p  {{ margin:.3rem 0 0; opacity:.9; font-size:.92rem; }}
+.hero h1 {{ margin:0; font-size:1.5rem; letter-spacing:.1px; }}
+.hero p  {{ margin:.35rem 0 0; opacity:.9; font-size:.93rem; }}
 
-/* Card thong tin */
+/* Info card */
 .card {{
   background:#fff; border:1px solid #e2e8f0;
-  border-radius:12px; padding:14px 16px;
+  border-radius:12px; padding:14px 18px;
   box-shadow:0 2px 8px rgba(20,30,50,.05); height:100%;
 }}
-.card h4 {{ margin:0 0 5px; color:var(--ink); font-size:.95rem; }}
+.card h4 {{ margin:0 0 6px; color:var(--ink); font-size:.96rem; }}
 
-/* So lieu lon (KPI) */
-.kpi {{ font-size:1.8rem; font-weight:700; line-height:1.1; }}
-.sub {{ color:#5a6678; font-size:.82rem; margin-top:2px; }}
+/* Large KPI number */
+.kpi {{ font-size:1.85rem; font-weight:700; line-height:1.1; }}
+.sub {{ color:#5a6678; font-size:.83rem; margin-top:2px; }}
 
-/* Nhan bieu hien */
+/* Badges */
 .badge {{
-  display:inline-block; padding:3px 10px;
-  border-radius:999px; font-size:.77rem; font-weight:700;
+  display:inline-block; padding:3px 11px;
+  border-radius:999px; font-size:.78rem; font-weight:700;
   color:#fff; margin:2px 3px 2px 0;
 }}
 .b-good  {{ background:var(--good);  }}
@@ -120,58 +121,65 @@ st.markdown(f"""
 .b-proxy {{ background:var(--proxy); }}
 .b-top1  {{ background:#D97706; }}
 .b-top3  {{ background:#7C3AED; }}
-.b-top5  {{ background:var(--good); }}
-.b-top10 {{ background:var(--comp); }}
+.b-top5  {{ background:var(--good);  }}
+.b-top10 {{ background:var(--comp);  }}
 
-/* Dong ung vien trong bang xep hang */
+/* Candidate ranking row */
 .cand-row {{
-  display:flex; align-items:center; gap:12px;
-  padding:9px 13px; border:1px solid #e2e8f0;
+  display:flex; align-items:center; gap:14px;
+  padding:10px 14px; border:1px solid #e2e8f0;
   border-radius:9px; margin:5px 0; background:#fafbfc;
 }}
-.cand-rank  {{ font-size:1.2rem; font-weight:700; color:#475569; min-width:30px; }}
+.cand-rank  {{ font-size:1.2rem; font-weight:700; color:#475569; min-width:32px; }}
 .cand-name  {{ font-weight:600; color:var(--ink); flex:1; }}
 .cand-score {{ font-size:1.2rem; font-weight:700;
-               color:var(--comp); min-width:52px; text-align:right; }}
+               color:var(--comp); min-width:54px; text-align:right; }}
 
-/* Hop verdict fairness */
-.verdict-cause {{ background:#fdece8; border:1px solid #f3b3a4;
-                  border-radius:10px; padding:12px 15px; color:#8f2d18; }}
-.verdict-clear {{ background:#e7f6ec; border:1px solid #a9dcb9;
-                  border-radius:10px; padding:12px 15px; color:#1d6b39; }}
-.verdict-warn  {{ background:#fff6e0; border:1px solid #f0d493;
-                  border-radius:10px; padding:12px 15px; color:#7a5800; }}
+/* Fairness verdict boxes */
+.v-clear {{ background:#e7f6ec; border:1px solid #a9dcb9;
+            border-radius:10px; padding:12px 16px; color:#1d6b39; }}
+.v-warn  {{ background:#fff6e0; border:1px solid #f0d493;
+            border-radius:10px; padding:12px 16px; color:#7a5800; }}
+.v-bad   {{ background:#fdece8; border:1px solid #f3b3a4;
+            border-radius:10px; padding:12px 16px; color:#8f2d18; }}
 
-/* Canh bao */
-.warn-box {{
+/* Alert box */
+.alert {{
   background:#fff7ed; border:1px solid #fed7aa;
-  border-radius:9px; padding:9px 13px;
+  border-radius:9px; padding:9px 14px;
   color:#9a3412; font-size:.86rem; margin:4px 0;
 }}
 
-/* Ngan cach section */
+/* Section divider */
 .sec {{
-  font-size:1.03rem; font-weight:700; color:var(--ink);
-  margin:16px 0 7px; padding-bottom:3px;
+  font-size:1.04rem; font-weight:700; color:var(--ink);
+  margin:18px 0 8px; padding-bottom:4px;
   border-bottom:2px solid #e2e8f0;
 }}
 
-/* Ghi chu cong bang */
+/* Fairness note */
 .fair-note {{
   background:#eff6ff; border:1px solid #bfdbfe;
-  border-radius:9px; padding:10px 14px;
-  color:#1d4ed8; font-size:.85rem; margin-top:6px;
+  border-radius:9px; padding:11px 15px;
+  color:#1d4ed8; font-size:.86rem; margin-top:8px;
+}}
+
+/* Upload zone hint */
+.upload-hint {{
+  background:#f8fafc; border:2px dashed #cbd5e1;
+  border-radius:10px; padding:14px 18px;
+  color:#475569; font-size:.88rem; margin-bottom:8px;
 }}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ===========================================================================
-# Helpers dung chung
+# Shared helper functions
 # ===========================================================================
 
 def _card(title: str, kpi: str, color: str, sub: str) -> str:
-    """Tao HTML card thong tin KPI."""
+    """Render an HTML KPI card."""
     return (
         f'<div class="card"><h4>{title}</h4>'
         f'<div class="kpi" style="color:{color}">{kpi}</div>'
@@ -179,40 +187,59 @@ def _card(title: str, kpi: str, color: str, sub: str) -> str:
     )
 
 
-def _badge(text: str, cls: str) -> str:
-    """Tao HTML badge nhan bieu hien."""
-    return f'<span class="badge {cls}">{text}</span>'
+def _read_pdf(uploaded_file) -> str:
+    """Extract plain text from a Streamlit UploadedFile (PDF).
+
+    Tries pdfminer.six first; falls back to raw byte decode if unavailable.
+    """
+    try:
+        from pdfminer.high_level import extract_text as _pdfminer
+        raw   = uploaded_file.read()
+        text  = _pdfminer(io.BytesIO(raw))
+    except ImportError:
+        uploaded_file.seek(0)
+        text = uploaded_file.read().decode("utf-8", errors="ignore")
+    except Exception:
+        uploaded_file.seek(0)
+        text = uploaded_file.read().decode("utf-8", errors="ignore")
+
+    # Normalise whitespace
+    text = re.sub(r"\r\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
 
 
 # ---------------------------------------------------------------------------
-# Tai mo hinh da huan luyen (cache resource -- chi tai 1 lan)
+# Load trained models (cached -- loaded only once per Streamlit session)
 # ---------------------------------------------------------------------------
 
-@st.cache_resource(show_spinner="Dang tai mo hinh AI...")
+@st.cache_resource(show_spinner="Loading AI models...")
 def _load_models(out_dir: str = "models/saved"):
-    """Nap LR + MLP models va scaler tu thu muc models/saved/.
+    """Load LR + MLP models and scalers from models/saved/.
 
-    Tu dong chay train_models.py neu cac file .pkl chua ton tai.
+    Automatically runs train_models.py if .pkl files are missing.
     """
     paths = {
-        "lr":       os.path.join(out_dir, "lr_model.pkl"),
-        "lr_sc":    os.path.join(out_dir, "lr_scaler.pkl"),
-        "mlp":      os.path.join(out_dir, "mlp_model.pkl"),
-        "mlp_sc":   os.path.join(out_dir, "mlp_scaler.pkl"),
-        "config":   os.path.join(out_dir, "config.pkl"),
+        "lr":     os.path.join(out_dir, "lr_model.pkl"),
+        "lr_sc":  os.path.join(out_dir, "lr_scaler.pkl"),
+        "mlp":    os.path.join(out_dir, "mlp_model.pkl"),
+        "mlp_sc": os.path.join(out_dir, "mlp_scaler.pkl"),
+        "config": os.path.join(out_dir, "config.pkl"),
     }
     if not all(os.path.exists(p) for p in paths.values()):
-        st.info("Chua tim thay mo hinh -- dang huan luyen tu FairCVdb...")
+        st.info("Trained models not found -- training now on FairCVdb (one-time only)...")
         import subprocess
         script = os.path.join(_ROOT_DIR, "models", "train_models.py")
         subprocess.run([sys.executable, script], check=True)
 
-    lr_model   = joblib.load(paths["lr"])
-    lr_scaler  = joblib.load(paths["lr_sc"])
-    mlp_model  = joblib.load(paths["mlp"])
-    mlp_scaler = joblib.load(paths["mlp_sc"])
-    config     = joblib.load(paths["config"])
-    return lr_model, lr_scaler, mlp_model, mlp_scaler, config
+    return (
+        joblib.load(paths["lr"]),
+        joblib.load(paths["lr_sc"]),
+        joblib.load(paths["mlp"]),
+        joblib.load(paths["mlp_sc"]),
+        joblib.load(paths["config"]),
+    )
 
 
 lr_model, lr_scaler, mlp_model, mlp_scaler, cfg = _load_models()
@@ -222,59 +249,59 @@ DEMO_MODE  = cfg.get("demo_mode",     False)
 
 if DEMO_MODE:
     st.warning(
-        "**Demo mode:** Mo hinh duoc huan luyen tren du lieu mo phong.  "
-        "Dat `FairCVdb.csv` that vao `data/` va chay lai "
-        "`python models/train_models.py` de co ket qua chinh xac."
+        "**Demo mode:** Models were trained on synthetic data.  "
+        "Place `FairCVdb.csv` in `data/` and run "
+        "`python models/train_models.py` for production-quality results."
     )
 
 
 # ===========================================================================
-# Sidebar -- Cau hinh chung cho ca 2 vai tro
+# Sidebar -- shared configuration for both roles
 # ===========================================================================
 
 with st.sidebar:
     st.markdown("## FairCV")
-    st.caption("He thong sang loc CV cong bang")
+    st.caption("Fair Recruitment Scoring System")
 
-    # -- Chon vai tro --
-    role = st.radio("Ban la", ["Recruiter (Nha tuyen dung)", "Candidate (Ung vien)"])
-
+    role = st.radio("I am a", ["Recruiter", "Candidate"])
     st.markdown("---")
 
-    if role.startswith("Recruiter"):
-        # ---- Thong tin vi tri tuyen dung ----
-        st.markdown("### Vi tri tuyen dung")
-        job_title = st.text_input("Ten vi tri", "Data Analyst")
+    if role == "Recruiter":
+
+        # -- Job position --------------------------------------------------
+        st.markdown("### Job Position")
+        job_title = st.text_input("Position title", "Data Analyst")
         job_desc  = st.text_area(
-            "Mo ta yeu cau",
-            "Toi thieu 2 nam kinh nghiem phan tich du lieu.  "
-            "Thanh thao Python va SQL.  Tieng Anh giao tiep.  "
-            "Uu tien co kinh nghiem machine learning.",
-            height=105,
+            "Job requirements",
+            "Minimum 2 years of data analysis experience.  "
+            "Proficient in Python and SQL.  "
+            "English communication required.  "
+            "Machine learning background preferred.",
+            height=110,
         )
         domain = st.selectbox(
-            "Linh vuc nganh nghe",
-            ["IT / Cong nghe", "Marketing", "Tai chinh / Ke toan",
-             "Nhan su / HR", "Khac"],
+            "Industry domain",
+            ["IT / Technology", "Marketing", "Finance / Accounting",
+             "Human Resources", "Other"],
         )
 
         st.markdown("---")
 
-        # ---- Trong so tieu chi (real-time) ----
-        st.markdown("### Trong so tieu chi")
+        # -- Scoring weights (real-time) -----------------------------------
+        st.markdown("### Scoring Weights")
         st.caption(
-            "Keo thanh truot de dieu chinh do uu tien.  "
-            "Ket qua xep hang cap nhat ngay lap tuc."
+            "Drag sliders to set criterion priority.  "
+            "Rankings update instantly."
         )
-        w_suit  = st.slider("Phu hop vi tri",     0.0, 1.0, 0.30, 0.05)
-        w_exp   = st.slider("Kinh nghiem lam viec", 0.0, 1.0, 0.25, 0.05)
-        w_edu   = st.slider("Trinh do hoc van",   0.0, 1.0, 0.20, 0.05)
-        w_lang1 = st.slider("Ngoai ngu chinh",    0.0, 1.0, 0.10, 0.05)
-        w_lang2 = st.slider("Ngoai ngu phu",      0.0, 1.0, 0.05, 0.05)
-        w_avail = st.slider("Co the bat dau som", 0.0, 1.0, 0.10, 0.05)
+        w_suit  = st.slider("Suitability to role",    0.0, 1.0, 0.30, 0.05)
+        w_exp   = st.slider("Work experience",         0.0, 1.0, 0.25, 0.05)
+        w_edu   = st.slider("Education level",         0.0, 1.0, 0.20, 0.05)
+        w_lang1 = st.slider("Primary language",        0.0, 1.0, 0.10, 0.05)
+        w_lang2 = st.slider("Secondary language",      0.0, 1.0, 0.05, 0.05)
+        w_avail = st.slider("Availability to start",   0.0, 1.0, 0.10, 0.05)
 
-        # Ma tran trong so tuong ung voi FEAT_COLS
-        # Recommendation bi loai (de bao dam cong bang -- tranh bias mang luoi)
+        # Weight vector aligned with FEAT_COLS order.
+        # Recommendation is excluded to prevent network/referral bias.
         weights = {
             "Suitability":    w_suit,
             "Language 1":     w_lang1,
@@ -282,25 +309,25 @@ with st.sidebar:
             "Language 3":     0.0,
             "Experience":     w_exp,
             "Education":      w_edu,
-            "Recommendation": 0.0,   # Loai bo -- de bao dam cong bang
+            "Recommendation": 0.0,   # Excluded -- prone to network bias
             "Availability":   w_avail,
         }
 
         st.markdown("---")
 
-        # ---- Chon mo hinh ----
-        st.markdown("### Mo hinh AI")
+        # -- Model selection -----------------------------------------------
+        st.markdown("### AI Model")
         model_choice = st.radio(
-            "Su dung mo hinh",
+            "Use model",
             ["LR (Logistic Regression)", "MLP (Neural Network)"],
-            help="LR: giai thich duoc, nhanh.\nMLP: phi tuyen, DP Gap thap hon."
+            help="LR: interpretable, fast.\nMLP: non-linear, lower DP Gap.",
         )
 
-        # ---- Cai dat AI extraction ----
+        # -- Claude API toggle ---------------------------------------------
         st.markdown("---")
-        st.markdown("### Trich xuat CV")
+        st.markdown("### CV Extraction")
         use_claude = st.toggle(
-            "Dung Claude API (chinh xac hon)",
+            "Use Claude API (more accurate)",
             value=bool(os.environ.get("ANTHROPIC_API_KEY")),
         )
         if use_claude and not os.environ.get("ANTHROPIC_API_KEY"):
@@ -310,247 +337,196 @@ with st.sidebar:
             use_claude = bool(os.environ.get("ANTHROPIC_API_KEY"))
 
     else:
-        # Candidate -- thong tin toi gian
-        job_title    = st.text_input("Vi tri ban ung tuyen", "Data Analyst")
-        job_desc     = st.text_area("Yeu cau thuong gap cua vi tri nay",
-                                    "Python, SQL, phan tich du lieu, 2+ nam kinh nghiem",
-                                    height=80)
-        domain       = "Khac"
+        # Candidate sidebar -- minimal config
+        job_title    = st.text_input("Position you are applying for", "Data Analyst")
+        job_desc     = st.text_area(
+            "Typical requirements for this role",
+            "Python, SQL, data analysis, 2+ years experience",
+            height=75,
+        )
+        domain       = "Other"
         model_choice = "MLP (Neural Network)"
         use_claude   = bool(os.environ.get("ANTHROPIC_API_KEY"))
         weights      = {c: 1.0 / len(FEAT_COLS) for c in FEAT_COLS}
 
-    # Hien thi chi so mo hinh
+    # -- Model performance summary (production mode only) ------------------
     if not DEMO_MODE:
         st.markdown("---")
-        st.markdown("### Hieu nang mo hinh")
+        st.markdown("### Model Performance")
         lrm  = cfg.get("lr_metrics",  {})
         mlpm = cfg.get("mlp_metrics", {})
         st.markdown(
-            f"| Mo hinh | F1 | AUC | DP Gap |\n|---|---|---|---|\n"
+            f"| Model | F1 | AUC | DP Gap |\n|---|---|---|---|\n"
             f"| LR  | {lrm.get('F1',0):.3f} | {lrm.get('ROC-AUC',0):.3f} | "
             f"{lrm.get('DP_Gap_Gender',0):.4f} |\n"
             f"| MLP | {mlpm.get('F1',0):.3f} | {mlpm.get('ROC-AUC',0):.3f} | "
             f"{mlpm.get('DP_Gap_Gender',0):.4f} |"
         )
-        st.caption("Huan luyen tren FairCVdb -- blind label (khong biet gioi tinh / dan toc)")
+        st.caption("Trained on FairCVdb blind label (gender / ethnicity blind)")
 
 
 # ===========================================================================
-# Ham trich xuat dac trung (Feature Extraction)
+# Feature extraction helpers
 # ===========================================================================
 
-# Tu dien tu khoa theo linh vuc nganh nghe
+# Keyword dictionaries by industry domain
 _DOMAIN_KEYWORDS: dict[str, list[str]] = {
-    "IT / Cong nghe": [
+    "IT / Technology": [
         "python", "java", "sql", "machine learning", "data", "ai", "software",
         "backend", "frontend", "cloud", "aws", "docker", "kubernetes",
         "tensorflow", "pytorch", "deep learning", "api", "git", "agile",
         "analyst", "engineer", "developer", "code", "programming",
-        "lap trinh", "cong nghe", "du lieu", "tri tue nhan tao",
     ],
     "Marketing": [
         "marketing", "brand", "campaign", "social media", "seo", "content",
         "digital", "advertising", "customer", "market research", "crm",
         "analytics", "e-commerce", "conversion", "roi", "kpi",
-        "thuong hieu", "quang cao", "khach hang", "thi truong",
     ],
-    "Tai chinh / Ke toan": [
+    "Finance / Accounting": [
         "finance", "accounting", "audit", "tax", "budget", "financial",
         "excel", "reporting", "investment", "risk", "compliance", "ifrs",
-        "ke toan", "tai chinh", "thue", "kiem toan", "bao cao tai chinh",
+        "cpa", "cfa", "gaap", "ledger", "reconciliation",
     ],
-    "Nhan su / HR": [
+    "Human Resources": [
         "hr", "human resources", "recruitment", "talent", "training",
         "performance", "payroll", "labor", "onboarding", "kpi",
-        "nhan su", "tuyen dung", "nhan luc", "dao tao", "luong",
+        "hrbp", "compensation", "benefits", "workforce",
     ],
-    "Khac": [],
+    "Other": [],
 }
 
 
-def parse_suitability_score(cv_text: str, domain: str) -> float:
-    """Cham diem 'Suitability' bang mat do tu khoa theo linh vuc nganh nghe.
+def _suitability_score(cv_text: str, domain: str, job_desc: str) -> float:
+    """Score 'Suitability' via keyword density + job description overlap.
 
-    Thuat toan:
-      1. Lay danh sach tu khoa tuong ung voi `domain`.
-      2. Dem so lan xuat hien (khong phan biet hoa/thuong) trong van ban CV.
-      3. Tinh ty le: mat_do = so_tu_khoa_tim_thay / tong_so_tu_khoa.
-      4. Nhan phi tuyen (sqrt) de trung binh hoa phan pho.
-      5. Ep ve khoang [0.1, 1.0].
-
-    Parameters
-    ----------
-    cv_text : Noi dung text thu cua CV.
-    domain  : Ten linh vuc nganh nghe (key trong _DOMAIN_KEYWORDS).
-
-    Returns
-    -------
-    float trong khoang [0.1, 1.0].
+    Algorithm:
+      1. Count domain keyword hits in cv_text (case-insensitive).
+      2. Compute keyword hit rate and apply sqrt to smooth the distribution.
+      3. Compute word overlap between cv_text and job_desc.
+      4. Weighted blend: 40% keyword density + 60% JD overlap.
+      5. Clip to [0.10, 1.00].
     """
-    keywords = _DOMAIN_KEYWORDS.get(domain, [])
-    if not keywords:
-        return 0.5   # Khong co tu dien -- diem trung binh
-
-    text_lower = cv_text.lower()
-    hits = sum(1 for kw in keywords if kw in text_lower)
-    ratio = hits / len(keywords)
-
-    # Phi tuyen de tranh diem 0 khi chi khop it tu
-    score = float(np.sqrt(ratio))
-
-    # Ep ve [0.1, 1.0] -- khong bao gio cho 0 hoan toan
-    return float(np.clip(score, 0.1, 1.0))
-
-
-def detect_gender_proxy(cv_text: str) -> float:
-    """Phat hien bien proxy gioi tinh tu van ban CV.
-
-    Cac tu chi gioi tinh nu: 'nu', 'female', 'chi', 'ba', 'she', 'her'.
-    Cac tu chi gioi tinh nam: 'nam', 'male', 'anh', 'ong', 'he', 'his'.
-
-    Returns
-    -------
-    float: 1.0 neu phat hien proxy nu, 0.0 neu proxy nam, 0.5 neu khong ro.
-    """
+    keywords   = _DOMAIN_KEYWORDS.get(domain, [])
     text_lower = cv_text.lower()
 
-    female_tokens = ["nu ", " nu,", "female", " chi ", " ba ", " she ", " her "]
-    male_tokens   = ["nam ", " nam,", "male", " anh ", " ong ", " he ", " his "]
+    if keywords:
+        hits      = sum(1 for kw in keywords if kw in text_lower)
+        kw_score  = float(np.sqrt(hits / len(keywords)))
+    else:
+        kw_score  = 0.5
 
-    female_count = sum(1 for t in female_tokens if t in text_lower)
-    male_count   = sum(1 for t in male_tokens   if t in text_lower)
+    req_words  = set(re.findall(r"\w{3,}", job_desc.lower()))
+    cv_words   = set(re.findall(r"\w{3,}", text_lower))
+    overlap    = len(req_words & cv_words) / max(len(req_words), 1)
+    jd_score   = float(min(1.0, overlap * 2.0))
 
-    if female_count > male_count:
+    return float(np.clip(0.40 * kw_score + 0.60 * jd_score, 0.10, 1.00))
+
+
+def _detect_gender_proxy(cv_text: str) -> float:
+    """Detect gender-indicating language in CV text.
+
+    Returns 1.0 (female cues found), 0.0 (male cues found),
+    or 0.5 (ambiguous / not detected).
+    This value is NEVER passed to the scoring model.
+    It is used only for a transparency warning in the UI.
+    """
+    tl = cv_text.lower()
+    female = sum(1 for t in ["female", " she ", " her ", " ms.", " mrs."] if t in tl)
+    male   = sum(1 for t in ["male",   " he ",  " his ", " mr."]          if t in tl)
+    if female > male:
         return 1.0
-    elif male_count > female_count:
+    if male > female:
         return 0.0
-    return 0.5   # Khong xac dinh
+    return 0.5
 
 
 def extract_features_heuristic(
     cv_text: str,
     job_title: str,
-    job_desc: str,
-    domain: str,
+    job_desc:  str,
+    domain:    str,
 ) -> dict:
-    """Trich xuat 8 dac trung FairCV bang quy tac (heuristic).
+    """Extract 8 FairCV competency features using rule-based heuristics.
 
-    Su dung khi khong co Claude API hoac de fallback.
-
-    Cac dac trung duoc trich xuat:
-      Suitability   -- mat do tu khoa theo linh vuc + yeu cau cong viec
-      Language 1    -- tieng Viet / tieng Anh (suy luan tu noi dung CV)
-      Language 2    -- ngoai ngu thu 2 duoc de cap
-      Language 3    -- ngoai ngu thu 3
-      Experience    -- uoc tinh tu so nam kiem duoc trong van ban
-      Education     -- bac hoc cao nhat duoc de cap
-      Recommendation-- co tuong thuat / gioi thieu khong
-      Availability  -- co the bat dau som khong
-
-    Parameters
-    ----------
-    cv_text   : Noi dung text CV.
-    job_title : Ten vi tri tuyen dung.
-    job_desc  : Mo ta yeu cau cong viec.
-    domain    : Linh vuc nganh nghe.
+    Used when Claude API is unavailable or disabled.
 
     Returns
     -------
-    dict {feature_name -> float [0,1]} + 'candidate_name' (str).
+    dict containing:
+        candidate_name : str
+        Suitability, Language 1-3, Experience, Education,
+        Recommendation, Availability : float in [0, 1]
+        Gender_Proxy  : float (0.0 / 0.5 / 1.0) -- NOT a model feature
+        reasoning     : dict with extraction notes
     """
     txt = cv_text.lower()
 
-    # -- Ten ung vien: dong dau tien khong rong ---------------------
+    # Candidate name: first non-empty line of the CV
     lines = [l.strip() for l in cv_text.split("\n") if l.strip()]
     name  = lines[0] if lines else "Unknown"
 
-    # -- Suitability: ket hop mat do tu khoa + overlap yeu cau ------
-    kw_score = parse_suitability_score(cv_text, domain)
-    req_words = set(re.findall(r"\w{3,}", job_desc.lower()))
-    cv_words  = set(re.findall(r"\w{3,}", txt))
-    overlap   = len(req_words & cv_words) / max(len(req_words), 1)
-    suitability = float(np.clip(0.4 * kw_score + 0.6 * min(1.0, overlap * 2), 0.1, 1.0))
+    # Suitability -- keyword + JD overlap
+    suitability = _suitability_score(cv_text, domain, job_desc)
 
-    # -- Kinh nghiem: so nam cao nhat tim duoc trong van ban ---------
-    yrs = re.findall(
-        r"(\d+)\s*(?:\+\s*)?(?:nam|years?|yrs?)\s*"
-        r"(?:of\s*)?(?:kinh\s*nghi[eê]m|experience)?",
-        txt,
-    )
-    max_yrs    = max((int(y) for y in yrs), default=0)
-    experience = float(np.clip(min(1.0, max_yrs / 5.0) if max_yrs else 0.3, 0.1, 1.0))
+    # Experience -- largest number of years found in text
+    yrs     = re.findall(r"(\d+)\s*(?:\+\s*)?(?:years?|yrs?)\s*(?:of\s*)?(?:experience)?", txt)
+    max_yrs = max((int(y) for y in yrs), default=0)
+    experience = float(np.clip(min(1.0, max_yrs / 5.0) if max_yrs else 0.30, 0.10, 1.00))
 
-    # -- Hoc van: bac hoc cao nhat ----------------------------------
-    education = 0.5
-    if any(k in txt for k in ["tien si", "ph.d", "phd", "doctorate"]):
-        education = 1.0
-    elif any(k in txt for k in ["thac si", "master", "mba", "msc", "m.s.", "m.e."]):
-        education = 0.8
-    elif any(k in txt for k in ["dai hoc", "bachelor", "university",
-                                  "b.s.", "b.e.", "b.a.", "cu nhan"]):
-        education = 0.6
-    elif any(k in txt for k in ["cao dang", "associate"]):
-        education = 0.4
+    # Education -- highest degree detected
+    if   any(k in txt for k in ["ph.d", "phd", "doctorate"]):          education = 1.00
+    elif any(k in txt for k in ["master", "mba", "msc", "m.s.", "m.e."]):education = 0.80
+    elif any(k in txt for k in ["bachelor", "university", "b.s.", "b.a."]):education = 0.60
+    elif any(k in txt for k in ["associate", "college"]):               education = 0.40
+    else:                                                                education = 0.50
 
-    # -- Ngoai ngu --------------------------------------------------
-    lang1 = 0.75   # mac dinh: co kha nang viet CV (tieng Viet / Anh)
-    lang2 = 0.55 if any(k in txt for k in [
-        "english", "tieng anh", "ielts", "toeic", "toefl"
-    ]) else 0.2
-    lang3 = 0.40 if any(k in txt for k in [
-        "japanese", "nhat", "chinese", "trung", "korean", "han",
-        "french", "phap", "german", "duc"
-    ]) else 0.1
+    # Language scores
+    lang1 = 0.75   # Default: candidate can write a CV (primary language)
+    lang2 = 0.55 if any(k in txt for k in ["english", "ielts", "toeic", "toefl"]) else 0.20
+    lang3 = 0.40 if any(k in txt for k in ["japanese", "chinese", "korean", "french", "german", "spanish"]) else 0.10
 
-    # -- Gioi thieu / Reference ------------------------------------
-    recommendation = 0.65 if any(k in txt for k in [
-        "reference", "recommendation", "gioi thieu", "referral"
-    ]) else 0.3
+    # Recommendation / reference
+    recommendation = 0.65 if any(k in txt for k in ["reference", "referral", "recommendation"]) else 0.30
 
-    # -- Co the bat dau som ----------------------------------------
-    availability = 1.0 if any(k in txt for k in [
-        "immediately", "ngay lap tuc", "bat dau ngay", "available now"
-    ]) else 0.65
+    # Availability
+    availability = 1.00 if any(k in txt for k in ["immediately", "available now", "start immediately"]) else 0.65
 
     return {
         "candidate_name": name,
-        "Suitability":    round(suitability, 3),
-        "Language 1":     round(lang1, 3),
-        "Language 2":     round(lang2, 3),
-        "Language 3":     round(lang3, 3),
-        "Experience":     round(experience, 3),
-        "Education":      round(education, 3),
+        "Suitability":    round(suitability,    3),
+        "Language 1":     round(lang1,          3),
+        "Language 2":     round(lang2,          3),
+        "Language 3":     round(lang3,          3),
+        "Experience":     round(experience,     3),
+        "Education":      round(education,      3),
         "Recommendation": round(recommendation, 3),
-        "Availability":   round(availability, 3),
-        "Gender_Proxy":   detect_gender_proxy(cv_text),
-        "reasoning":      {"note": "Heuristic (chua co Claude API)"},
+        "Availability":   round(availability,   3),
+        "Gender_Proxy":   _detect_gender_proxy(cv_text),
+        "reasoning":      {"note": "Extracted by rule-based heuristic (Claude API not active)."},
     }
 
 
-def extract_features_claude(
-    cv_text: str,
-    job_title: str,
-    job_desc: str,
-) -> dict:
-    """Trich xuat 8 dac trung FairCV bang Claude API (chinh xac hon).
+def extract_features_claude(cv_text: str, job_title: str, job_desc: str) -> dict:
+    """Extract 8 FairCV competency features using Claude API.
 
-    Yeu cau ANTHROPIC_API_KEY trong bien moi truong.
+    Requires ANTHROPIC_API_KEY set in the environment.
+    Falls back to heuristic on any API error.
     """
     import anthropic
 
-    PROMPT = """Ban la chuyen gia phan tich CV tuyen dung.
-Doc CV duoi day va yeu cau cong viec, cham diem tung tieu chi tu 0.0 den 1.0.
+    PROMPT = """You are an expert HR analyst.
+Read the CV below and the job description, then score each feature from 0.0 to 1.0.
 
-Vi tri: {job_title}
-Yeu cau: {job_desc}
+Job title: {job_title}
+Job requirements: {job_desc}
 
-Noi dung CV (3500 ky tu dau):
+CV (first 3 500 characters):
 {cv_text}
 
-Tra ve JSON thuan (KHONG markdown, KHONG giai thich):
+Reply with ONLY valid JSON -- no markdown fences, no explanation:
 {{
-  "candidate_name": "Ten day du cua ung vien",
+  "candidate_name": "Candidate full name",
   "Suitability":    0.0,
   "Language 1":     0.0,
   "Language 2":     0.0,
@@ -560,21 +536,21 @@ Tra ve JSON thuan (KHONG markdown, KHONG giai thich):
   "Recommendation": 0.0,
   "Availability":   0.0,
   "reasoning": {{
-    "Suitability": "ly do ngan gon",
-    "Experience":  "ly do ngan gon",
-    "Education":   "ly do ngan gon"
+    "Suitability": "brief reason",
+    "Experience":  "brief reason",
+    "Education":   "brief reason"
   }}
 }}
 
-Huong dan cham diem:
-- Suitability  : muc do phu hop tong the voi vi tri va yeu cau
-- Language 1   : chat luong ngon ngu chinh (suy luan tu cach viet CV)
-- Language 2   : ngoai ngu thu 2 duoc de cap (0.2 neu khong co)
-- Language 3   : ngoai ngu thu 3 (0.1 neu khong co)
-- Experience   : 0=khong, 0.3=<1nam, 0.5=1-2nam, 0.7=3-5nam, 1.0=5+nam
-- Education    : 0.4=cao dang, 0.6=dai hoc, 0.8=thac si, 1.0=tien si
-- Recommendation: 0.3=khong, 0.65=co reference, 1.0=thu gioi thieu
-- Availability : 1.0=ngay, 0.6=1 thang, 0.3=3+ thang
+Scoring guide:
+  Suitability   : overall fit with the job title and requirements
+  Language 1    : primary language quality inferred from CV writing style
+  Language 2    : second language mentioned (0.20 if none)
+  Language 3    : third language mentioned (0.10 if none)
+  Experience    : 0=none, 0.30=<1yr, 0.50=1-2yr, 0.70=3-5yr, 1.00=5+yr relevant
+  Education     : 0.40=associate, 0.60=bachelor, 0.80=master, 1.00=PhD + relevant field
+  Recommendation: 0.30=none, 0.65=references listed, 1.00=formal letter attached
+  Availability  : 1.00=immediate, 0.60=within 1 month, 0.30=3+ months
 """
     client = anthropic.Anthropic()
     resp   = client.messages.create(
@@ -588,87 +564,86 @@ Huong dan cham diem:
     )
     raw = resp.content[0].text.strip()
     raw = re.sub(r"```json\s*|```", "", raw).strip()
-    return json.loads(raw)
+    data = json.loads(raw)
+    # Always add Gender_Proxy (not sent to API, computed locally)
+    data["Gender_Proxy"] = _detect_gender_proxy(cv_text)
+    return data
 
 
 def extract_features(
-    cv_text: str,
-    job_title: str,
-    job_desc: str,
-    domain: str,
+    cv_text:    str,
+    job_title:  str,
+    job_desc:   str,
+    domain:     str,
     use_claude: bool = False,
 ) -> dict:
-    """Dieu huong sang Claude API hoac heuristic tuy theo cau hinh."""
+    """Route to Claude API or heuristic based on configuration."""
     if use_claude and os.environ.get("ANTHROPIC_API_KEY"):
         try:
             return extract_features_claude(cv_text, job_title, job_desc)
-        except Exception as e:
-            st.warning(f"Claude API loi ({e}), chuyen sang heuristic.")
+        except Exception as exc:
+            st.warning(f"Claude API error ({exc}). Falling back to heuristic.")
     return extract_features_heuristic(cv_text, job_title, job_desc, domain)
 
 
 # ===========================================================================
-# Ham cham diem ung vien (Scoring)
+# Candidate scoring
 # ===========================================================================
 
 def score_candidate(
-    features:   dict,
-    weights:    dict,
+    features:     dict,
+    weights:      dict,
     model_choice: str,
 ) -> dict:
-    """Cham diem 1 ung vien bang mo hinh da huan luyen.
+    """Score one candidate using a trained FairCVdb model.
 
-    Quy trinh:
-      1. Chon mo hinh va scaler tuong ung (LR / MLP).
-      2. Nhan trong so tieu chi vao vector dac trung truoc khi scale.
-         (Buoc nay dam bao slider real-time anh huong truc tiep den diem.)
-      3. Scale bang scaler da fit tren FairCVdb.
-      4. Du doan xac suat "Recommended".
-      5. Tinh diem cuoi = 60% diem mo hinh + 40% criteria match.
+    Pipeline:
+      1. Build raw feature vector aligned with FEAT_COLS.
+      2. Apply recruiter weight vector to feature values
+         (real-time: slider changes immediately affect ranking).
+      3. StandardScaler.transform() -- avoids input scale drift.
+      4. Model.predict_proba() -- probability of 'Recommended'.
+      5. Final score = 60% model probability + 40% weighted criteria match.
 
     Parameters
     ----------
-    features    : dict {feature_name -> float [0,1]}.
-    weights     : dict {feature_name -> weight [0,1]} tu sidebar.
-    model_choice: 'LR (Logistic Regression)' hoac 'MLP (Neural Network)'.
+    features     : dict {feature_name -> float [0, 1]}
+    weights      : dict {feature_name -> weight [0, 1]} from sidebar sliders
+    model_choice : 'LR (Logistic Regression)' or 'MLP (Neural Network)'
 
     Returns
     -------
-    dict voi cac key: model_score, criteria_score, final_score, verdict, ...
+    dict with keys:
+        model_label, model_score, criteria_score, final_score, verdict,
+        tier_color, x_raw
     """
-    # -- Chon mo hinh va scaler theo lua chon nguoi dung ---------------
+    # Select model and scaler
     if model_choice.startswith("MLP"):
-        model  = mlp_model
-        scaler = mlp_scaler
-        model_label = "MLP"
+        model, scaler, label = mlp_model, mlp_scaler, "MLP"
     else:
-        model  = lr_model
-        scaler = lr_scaler
-        model_label = "LR"
+        model, scaler, label = lr_model,  lr_scaler,  "LR"
 
-    # -- Vector dac trung theo dung thu tu FEAT_COLS --------------------
+    # Raw feature vector (ordered by FEAT_COLS)
     x_raw = np.array([float(features.get(c, 0.5)) for c in FEAT_COLS])
 
-    # -- Ap trong so tieu chi nha tuyen dung vao vector (REAL-TIME) -----
-    # Cach nay dam bao slider thay doi tren sidebar lam thay doi ngay
-    # thu tu xep hang ma khong can re-train mo hinh.
-    w_vec = np.array([weights.get(c, 0.0) for c in FEAT_COLS])
+    # Weight vector
+    w_vec   = np.array([weights.get(c, 0.0) for c in FEAT_COLS])
     total_w = w_vec.sum() or 1.0
 
-    # Criteria score: trung binh co trong so
+    # Weighted criteria match score (recruiter's custom priority blend)
     criteria = float(np.dot(w_vec, x_raw) / total_w)
 
-    # Vector dac trung co trong so (dua vao mo hinh)
+    # Boost features with high recruiter weight before scaling
+    # (ensures slider changes propagate through model input, not just ranking)
     x_weighted = x_raw * (1.0 + 0.5 * w_vec / (w_vec.max() + 1e-9))
 
-    # -- Chuan hoa (scale) de tranh lech thang diem dau vao AI ---------
-    X = x_weighted.reshape(1, -1)
-    X_scaled = scaler.transform(X)
+    # Normalise to trained scale (avoids distribution mismatch)
+    X_scaled = scaler.transform(x_weighted.reshape(1, -1))
 
-    # -- Du doan xac suat boi mo hinh da huan luyen tren FairCVdb ------
+    # Model prediction
     model_prob = float(model.predict_proba(X_scaled)[0][1])
 
-    # -- Diem cuoi hop nhat: 60% mo hinh + 40% criteria match ----------
+    # Final combined score
     final = 0.60 * model_prob + 0.40 * criteria
 
     tier_color = (
@@ -678,13 +653,13 @@ def score_candidate(
     )
 
     return {
-        "model_label":   model_label,
-        "model_score":   round(model_prob * 100, 1),
-        "criteria_score":round(criteria  * 100, 1),
-        "final_score":   round(final     * 100, 1),
-        "verdict":       "Recommended" if model_prob >= 0.5 else "Not recommended",
-        "tier_color":    tier_color,
-        "x_raw":         x_raw,
+        "model_label":    label,
+        "model_score":    round(model_prob * 100, 1),
+        "criteria_score": round(criteria   * 100, 1),
+        "final_score":    round(final      * 100, 1),
+        "verdict":        "Recommended" if model_prob >= 0.5 else "Not recommended",
+        "tier_color":     tier_color,
+        "x_raw":          x_raw,
     }
 
 
@@ -692,332 +667,335 @@ def score_candidate(
 # RECRUITER VIEW
 # ===========================================================================
 
-if role.startswith("Recruiter"):
+if role == "Recruiter":
 
     st.markdown(
         '<div class="hero">'
-        '<h1>Recruiter -- Sang loc CV & Kiem toan cong bang</h1>'
-        '<p>Dat tieu chi va trong so ben trai, upload goi ho so ZIP, '
-        'de 2 mo hinh AI cham diem va xep hang ung vien mot cach cong bang.</p>'
+        '<h1>Recruiter -- CV Screening & Fairness Audit</h1>'
+        '<p>Set your job criteria and scoring weights on the left, '
+        'upload candidate PDF files, and let two independent AI models '
+        'rank them fairly.</p>'
         '</div>',
         unsafe_allow_html=True,
     )
 
     tab_screen, tab_fair, tab_shap = st.tabs([
-        "Sang loc CV",
+        "CV Screening",
         "Fairness Audit",
-        "SHAP -- Giai thich AI",
+        "SHAP -- XAI Explanations",
     ])
 
     # -------------------------------------------------------------------
-    # Tab 1: Sang loc CV (Upload ZIP + Ranking)
+    # Tab 1: CV Screening
     # -------------------------------------------------------------------
     with tab_screen:
 
-        # -- Hien thi tieu chi dang hoat dong --------------------------
-        st.markdown('<div class="sec">Tieu chi dang hoat dong</div>',
+        # -- Active criteria summary ------------------------------------
+        st.markdown('<div class="sec">Active Screening Criteria</div>',
                     unsafe_allow_html=True)
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(
-            _card("Vi tri",
-                  job_title[:22] if len(job_title) > 22 else job_title,
-                  COMP, f"Linh vuc: {domain}"),
+        cc1, cc2, cc3 = st.columns(3)
+
+        cc1.markdown(
+            _card("Position", job_title[:24] if len(job_title) > 24 else job_title,
+                  COMP, f"Domain: {domain}"),
             unsafe_allow_html=True,
         )
-        top3_w = sorted(
-            ((k, v) for k, v in weights.items() if v > 0),
-            key=lambda x: -x[1],
-        )[:4]
-        c2.markdown(
-            '<div class="card"><h4>Trong so uu tien</h4>'
+
+        top_w = sorted(((k, v) for k, v in weights.items() if v > 0), key=lambda x: -x[1])[:5]
+        cc2.markdown(
+            '<div class="card"><h4>Priority Weights</h4>'
             + "".join(
                 f'<div style="display:flex;justify-content:space-between;'
-                f'font-size:.88rem;margin:3px 0">'
+                f'font-size:.87rem;margin:3px 0">'
                 f'<span>{k}</span><b>{v:.0%}</b></div>'
-                for k, v in top3_w
+                for k, v in top_w
             )
-            + '</div>',
+            + "</div>",
             unsafe_allow_html=True,
         )
-        c3.markdown(
-            '<div class="card"><h4>Dam bao cong bang</h4>'
-            '<div style="font-size:.84rem;line-height:1.8">'
-            'Blind label training<br>'
-            'Khong dung gender / ethnicity<br>'
-            'Recommendation bi loai tru<br>'
-            f'Mo hinh: {model_choice.split()[0]}'
+
+        cc3.markdown(
+            '<div class="card"><h4>Fairness Guarantees</h4>'
+            '<div style="font-size:.84rem;line-height:1.85">'
+            'Blind label training (FairCVdb)<br>'
+            'Gender &amp; ethnicity excluded from features<br>'
+            'Recommendation criterion excluded<br>'
+            f'Active model: {model_choice.split()[0]}'
             '</div></div>',
             unsafe_allow_html=True,
         )
 
         st.markdown("")
 
-        # -- Upload goi ho so ZIP --------------------------------------
-        st.markdown('<div class="sec">Upload goi ho so ung vien (.zip)</div>',
+        # -- PDF upload (multiple files) --------------------------------
+        st.markdown('<div class="sec">Upload Candidate CVs</div>',
                     unsafe_allow_html=True)
-        st.caption(
-            "File ZIP nen chua cac file .txt hoac .pdf -- "
-            "moi file la ho so cua 1 ung vien. "
-            "Giai nen hoan toan trong RAM, khong ghi len server."
+
+        st.markdown(
+            '<div class="upload-hint">'
+            '<b>Format:</b> PDF only &nbsp;|&nbsp; '
+            '<b>Limit:</b> Up to 200 MB total &nbsp;|&nbsp; '
+            '<b>One file per candidate</b> &nbsp;|&nbsp; '
+            'Minimum 10 files recommended for meaningful ranking.'
+            '</div>',
+            unsafe_allow_html=True,
         )
-        uploaded_zip = st.file_uploader(
-            "Chon file ZIP",
-            type=["zip"],
-            help="Toi da ~200MB. Moi file = 1 ung vien.",
+
+        uploaded_pdfs = st.file_uploader(
+            "Select PDF files (hold Ctrl / Cmd to pick multiple)",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="recruiter_upload",
+            help="Each PDF = one candidate. Upload 10 or more for best results.",
         )
+
+        # File count feedback
+        if uploaded_pdfs:
+            n_files = len(uploaded_pdfs)
+            color   = GOOD if n_files >= 10 else WARN if n_files >= 3 else BAD
+            st.markdown(
+                f'<div style="font-size:.9rem;margin:4px 0 10px">'
+                f'<b style="color:{color}">{n_files} file(s) selected.</b>'
+                + (" Ready to evaluate." if n_files >= 10
+                   else f" Recommend at least 10 files for a meaningful ranking.")
+                + "</div>",
+                unsafe_allow_html=True,
+            )
 
         run_btn = st.button(
-            "Bat dau cham diem",
+            "Start Evaluation",
             type="primary",
-            disabled=(uploaded_zip is None),
+            disabled=(not uploaded_pdfs),
         )
 
-        if run_btn and uploaded_zip is not None:
-            with st.spinner("Dang giai nen va phan tich ho so..."):
+        if run_btn and uploaded_pdfs:
+            results, errors = [], []
+            progress = st.progress(0, text="Initialising...")
 
-                # -- Buoc 1: Giai nen ZIP trong RAM ---------------------
+            for i, pdf_file in enumerate(uploaded_pdfs):
+                progress.progress(
+                    (i + 1) / len(uploaded_pdfs),
+                    text=f"Processing ({i+1}/{len(uploaded_pdfs)}): {pdf_file.name}",
+                )
                 try:
-                    cv_list = extract_cvs_from_zip(uploaded_zip)
-                except ValueError as e:
-                    st.error(f"Loi file ZIP: {e}")
-                    st.stop()
+                    cv_text = _read_pdf(pdf_file)
+                    if len(cv_text.strip()) < 50:
+                        raise ValueError("CV content too short or unreadable.")
 
-                if not cv_list:
-                    st.warning("Khong tim thay file .txt hoac .pdf trong ZIP.")
-                    st.stop()
+                    feats     = extract_features(cv_text, job_title, job_desc, domain, use_claude)
+                    name      = feats.pop("candidate_name", pdf_file.name.replace(".pdf", ""))
+                    reasoning = feats.pop("reasoning", {})
+                    gender_px = feats.pop("Gender_Proxy", 0.5)
 
-                st.info(f"Tim thay {len(cv_list)} ho so trong ZIP.")
+                    scores = score_candidate(feats, weights, model_choice)
 
-                # -- Buoc 2: Trich xuat dac trung va cham diem ---------
-                results, errors = [], []
-                progress = st.progress(0, text="Dang xu ly...")
+                    results.append({
+                        "Candidate":       name,
+                        "File":            pdf_file.name,
+                        "Final Score":     scores["final_score"],
+                        "Model Score":     scores["model_score"],
+                        "Criteria Match":  scores["criteria_score"],
+                        "Verdict":         scores["verdict"],
+                        "tier_color":      scores["tier_color"],
+                        "Gender_Proxy":    gender_px,
+                        **{k: round(float(feats.get(k, 0)), 3) for k in FEAT_COLS},
+                        "_reasoning":      reasoning,
+                    })
 
-                for i, cv_item in enumerate(cv_list):
-                    progress.progress(
-                        (i + 1) / len(cv_list),
-                        text=f"Xu ly {i+1}/{len(cv_list)}: {cv_item['filename']}",
-                    )
-                    try:
-                        feats = extract_features(
-                            cv_item["text"], job_title, job_desc,
-                            domain, use_claude,
-                        )
-                        name      = feats.pop("candidate_name", cv_item["filename"])
-                        reasoning = feats.pop("reasoning", {})
-                        gender_px = feats.pop("Gender_Proxy", 0.5)
+                except Exception as exc:
+                    errors.append(f"{pdf_file.name}: {exc}")
 
-                        scores = score_candidate(feats, weights, model_choice)
-
-                        results.append({
-                            "Ung vien":        name,
-                            "File":            cv_item["filename"],
-                            "Diem cuoi":       scores["final_score"],
-                            "Diem mo hinh":    scores["model_score"],
-                            "Phu hop tieu chi":scores["criteria_score"],
-                            "Verdict":         scores["verdict"],
-                            "tier_color":      scores["tier_color"],
-                            "Gender_Proxy":    gender_px,
-                            **{k: round(float(feats.get(k, 0)), 3) for k in FEAT_COLS},
-                            "_reasoning":      reasoning,
-                        })
-
-                    except Exception as e:
-                        errors.append(f"{cv_item['filename']}: {e}")
-
-                progress.empty()
-                if errors:
-                    st.warning("Loi o mot so file:\n" + "\n".join(errors))
+            progress.empty()
+            if errors:
+                st.warning("Some files could not be processed:\n" + "\n".join(errors))
 
             if results:
-                # -- Buoc 3: Xep hang theo Diem cuoi (da co trong so) --
-                ranked = sorted(results, key=lambda x: x["Diem cuoi"], reverse=True)
+                # Sort by Final Score descending
+                ranked = sorted(results, key=lambda r: r["Final Score"], reverse=True)
                 for i, r in enumerate(ranked):
                     r["rank"] = i + 1
                     if   i == 0: r["tier_label"], r["tier_badge"] = "Top 1",  "b-top1"
-                    elif i < 3:  r["tier_label"], r["tier_badge"] = "Top 3",  "b-top3"
-                    elif i < 5:  r["tier_label"], r["tier_badge"] = "Top 5",  "b-top5"
+                    elif i <  3: r["tier_label"], r["tier_badge"] = "Top 3",  "b-top3"
+                    elif i <  5: r["tier_label"], r["tier_badge"] = "Top 5",  "b-top5"
                     else:        r["tier_label"], r["tier_badge"] = "Top 10", "b-top10"
 
-                st.session_state["ranked"]  = ranked
-                st.session_state["weights"] = weights
-                st.success(f"Da cham diem {len(ranked)} ung vien.")
+                st.session_state["ranked"] = ranked
+                st.success(f"Successfully evaluated {len(ranked)} candidate(s).")
 
-        # -- Hien thi ket qua (cap nhat theo within so real-time) ------
+        # -- Display results (re-ranked live on every slider change) ----
         if "ranked" in st.session_state:
-            raw_ranked = st.session_state["ranked"]
-            cur_weights = weights   # Lay trong so HIEN TAI tu sidebar
+            raw_ranked  = st.session_state["ranked"]
+            cur_weights = weights   # current slider values
 
-            # -- Re-rank theo trong so hien tai (real-time slider) ------
-            def _rerank(rows, cur_w):
-                """Tinh lai Diem cuoi theo trong so hien tai va sap xep lai."""
-                w_vec  = np.array([cur_w.get(c, 0.0) for c in FEAT_COLS])
-                total  = w_vec.sum() or 1.0
+            def _rerank(rows: list, cw: dict) -> list:
+                """Recompute Final Score with current slider weights and re-sort."""
+                w_vec = np.array([cw.get(c, 0.0) for c in FEAT_COLS])
+                total = w_vec.sum() or 1.0
                 for r in rows:
                     x = np.array([float(r.get(c, 0.5)) for c in FEAT_COLS])
-                    r["Phu hop tieu chi"] = round(float(np.dot(w_vec, x) / total) * 100, 1)
-                    model_s = r["Diem mo hinh"] / 100.0
-                    crit_s  = r["Phu hop tieu chi"] / 100.0
-                    r["Diem cuoi"] = round((0.60 * model_s + 0.40 * crit_s) * 100, 1)
-                return sorted(rows, key=lambda x: x["Diem cuoi"], reverse=True)
+                    crit = float(np.dot(w_vec, x) / total)
+                    r["Criteria Match"] = round(crit * 100, 1)
+                    r["Final Score"]    = round(
+                        (0.60 * r["Model Score"] / 100.0 + 0.40 * crit) * 100, 1
+                    )
+                return sorted(rows, key=lambda r: r["Final Score"], reverse=True)
 
             ranked = _rerank(raw_ranked, cur_weights)
-            n = len(ranked)
+            n      = len(ranked)
 
-            # -- KPI row ------------------------------------------------
-            st.markdown('<div class="sec">Ket qua xep hang</div>',
+            # KPI summary row
+            st.markdown('<div class="sec">Ranking Results</div>',
                         unsafe_allow_html=True)
-            k1, k2, k3 = st.columns(3)
-            k1.metric("Tong ung vien", n)
-            k2.metric("Duoc khuyen nghi",
-                      sum(1 for r in ranked if r["Verdict"] == "Recommended"))
-            k3.metric("Diem trung binh",
-                      f"{np.mean([r['Diem cuoi'] for r in ranked]):.1f}")
+            km1, km2, km3, km4 = st.columns(4)
+            km1.metric("Total candidates", n)
+            km2.metric("Recommended",
+                       sum(1 for r in ranked if r["Verdict"] == "Recommended"))
+            km3.metric("Average score",
+                       f"{np.mean([r['Final Score'] for r in ranked]):.1f}")
+            km4.metric("Top score",
+                       f"{ranked[0]['Final Score']:.1f}" if ranked else "—")
 
-            # Canh bao ung vien co gender proxy
-            proxy_warn = [r for r in ranked if r.get("Gender_Proxy") in (0.0, 1.0)]
-            if proxy_warn:
+            # Gender proxy alert
+            proxy_n = sum(1 for r in ranked if r.get("Gender_Proxy") in (0.0, 1.0))
+            if proxy_n:
                 st.markdown(
-                    f'<div class="warn-box">'
-                    f'{len(proxy_warn)} ho so co tu ngu chi gioi tinh ro rang.  '
-                    f'Mo hinh KHONG dung thong tin nay de cham diem, nhung HR '
-                    f'can luu y ve rui ro bias thu cong khi xem xet.'
+                    f'<div class="alert">'
+                    f'{proxy_n} CV(s) contain explicit gender-indicating language.  '
+                    f'The AI model does <b>not</b> use this information for scoring, '
+                    f'but human reviewers should be aware of potential manual bias.'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
 
-            # -- Tabs xep hang ------------------------------------------
+            # -- Ranking tabs -------------------------------------------
             rt1, rt2, rt3, rt4 = st.tabs(["Top 10", "Top 5", "Top 3", "Top 1"])
 
-            def _render_list(pool):
+            def _render_rows(pool: list) -> None:
                 for r in pool:
                     st.markdown(
                         f'<div class="cand-row">'
                         f'<span class="cand-rank">#{r["rank"]}</span>'
-                        f'<span class="cand-name">{r["Ung vien"]}</span>'
+                        f'<span class="cand-name">{r["Candidate"]}</span>'
                         f'<span class="badge {r["tier_badge"]}">{r["tier_label"]}</span>'
-                        f'<span class="cand-score">{r["Diem cuoi"]:.1f}</span>'
+                        f'<span class="cand-score">{r["Final Score"]:.1f}</span>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
 
             with rt1:
                 pool10 = ranked[:min(10, n)]
-                _render_list(pool10)
-                df_show = pd.DataFrame(pool10)[[
-                    "rank", "Ung vien", "Diem cuoi",
-                    "Diem mo hinh", "Phu hop tieu chi", "Verdict",
-                ]]
-                st.dataframe(df_show, use_container_width=True, hide_index=True)
+                _render_rows(pool10)
 
-                # Bieu do thanh so sanh
-                fig, ax = plt.subplots(figsize=(10, 3.8))
-                names = [r["Ung vien"][:14] for r in pool10]
-                ms    = [r["Diem mo hinh"]    for r in pool10]
-                cs    = [r["Phu hop tieu chi"] for r in pool10]
-                fs    = [r["Diem cuoi"]        for r in pool10]
-                x     = np.arange(len(names))
-                w_bar = 0.27
-                ax.bar(x - w_bar, ms, w_bar, label="Mo hinh AI",
-                       color=COMP, alpha=.85, edgecolor="white")
-                ax.bar(x,         cs, w_bar, label="Phu hop tieu chi",
-                       color=GOOD, alpha=.85, edgecolor="white")
-                ax.bar(x + w_bar, fs, w_bar, label="Diem cuoi",
-                       color=PRXY, alpha=.85, edgecolor="white")
-                ax.set_xticks(x)
-                ax.set_xticklabels(names, rotation=30, ha="right", fontsize=8)
-                ax.set_ylabel("Diem (%)")
-                ax.set_ylim(0, 105)
-                ax.legend(fontsize=8)
-                ax.set_title("So sanh diem -- Top 10",
-                             fontweight="bold", color=INK)
+                df10 = pd.DataFrame(pool10)[[
+                    "rank", "Candidate", "Final Score",
+                    "Model Score", "Criteria Match", "Verdict",
+                ]]
+                st.dataframe(df10, use_container_width=True, hide_index=True)
+
+                # Grouped bar chart
+                names_10 = [r["Candidate"][:14] for r in pool10]
+                x10      = np.arange(len(names_10))
+                wb       = 0.27
+                fig10, ax10 = plt.subplots(figsize=(10, 3.8))
+                ax10.bar(x10 - wb, [r["Model Score"]    for r in pool10],
+                         wb, label="Model Score",    color=COMP, alpha=.85, edgecolor="white")
+                ax10.bar(x10,      [r["Criteria Match"] for r in pool10],
+                         wb, label="Criteria Match", color=GOOD, alpha=.85, edgecolor="white")
+                ax10.bar(x10 + wb, [r["Final Score"]    for r in pool10],
+                         wb, label="Final Score",    color=PRXY, alpha=.85, edgecolor="white")
+                ax10.set_xticks(x10)
+                ax10.set_xticklabels(names_10, rotation=30, ha="right", fontsize=8)
+                ax10.set_ylabel("Score (%)")
+                ax10.set_ylim(0, 108)
+                ax10.legend(fontsize=8)
+                ax10.set_title("Score Comparison -- Top 10", fontweight="bold", color=INK)
                 for sp in ["top", "right"]:
-                    ax.spines[sp].set_visible(False)
-                ax.grid(axis="y", alpha=0.18)
+                    ax10.spines[sp].set_visible(False)
+                ax10.grid(axis="y", alpha=0.18)
                 plt.tight_layout()
-                st.pyplot(fig)
-                plt.close(fig)
+                st.pyplot(fig10)
+                plt.close(fig10)
 
             with rt2:
-                _render_list(ranked[:min(5, n)])
+                pool5 = ranked[:min(5, n)]
+                _render_rows(pool5)
                 cols5 = st.columns(min(5, n))
-                for j, (r, col) in enumerate(zip(ranked[:5], cols5)):
+                for j, (r, col) in enumerate(zip(pool5, cols5)):
                     col.markdown(
                         f'<div class="card" style="text-align:center">'
                         f'<div style="font-size:.78rem;color:{MUT}">#{r["rank"]}</div>'
                         f'<div class="kpi" style="color:{r["tier_color"]};'
-                        f'font-size:1.65rem">{r["Diem cuoi"]:.0f}</div>'
-                        f'<div style="font-weight:600;margin:5px 0 3px;'
-                        f'font-size:.86rem">{r["Ung vien"][:16]}</div>'
+                        f'font-size:1.65rem">{r["Final Score"]:.0f}</div>'
+                        f'<div style="font-weight:600;margin:5px 0 3px;font-size:.86rem">'
+                        f'{r["Candidate"][:18]}</div>'
                         f'<div style="font-size:.78rem;color:{MUT}">'
-                        f'AI {r["Diem mo hinh"]:.0f}% &nbsp; Tieu chi '
-                        f'{r["Phu hop tieu chi"]:.0f}%</div></div>',
+                        f'AI {r["Model Score"]:.0f}% &nbsp; Criteria '
+                        f'{r["Criteria Match"]:.0f}%</div>'
+                        f'</div>',
                         unsafe_allow_html=True,
                     )
 
             with rt3:
-                for r in ranked[:min(3, n)]:
+                pool3 = ranked[:min(3, n)]
+                for r in pool3:
                     with st.expander(
-                        f"#{r['rank']}  {r['Ung vien']}  "
-                        f"--  {r['Diem cuoi']:.1f} diem  |  {r['Verdict']}",
+                        f"#{r['rank']}  {r['Candidate']}  "
+                        f"--  {r['Final Score']:.1f} pts  |  {r['Verdict']}",
                         expanded=(r["rank"] == 1),
                     ):
-                        ca, cb = st.columns(2)
-                        ca.metric("Diem mo hinh",     f"{r['Diem mo hinh']:.1f}%")
-                        cb.metric("Phu hop tieu chi", f"{r['Phu hop tieu chi']:.1f}%")
+                        ea, eb = st.columns(2)
+                        ea.metric("Model Score",    f"{r['Model Score']:.1f}%")
+                        eb.metric("Criteria Match", f"{r['Criteria Match']:.1f}%")
 
-                        fv  = [r.get(f, 0) for f in FEAT_COLS]
-                        bc  = [GOOD if v >= 0.65 else WARN if v >= 0.4 else BAD
-                               for v in fv]
+                        fv3 = [r.get(f, 0) for f in FEAT_COLS]
+                        bc3 = [GOOD if v >= 0.65 else WARN if v >= 0.4 else BAD for v in fv3]
                         fig3, ax3 = plt.subplots(figsize=(8, 3))
-                        ax3.barh(FEAT_NAMES, fv, color=bc,
-                                 edgecolor="white", height=.6)
-                        ax3.axvline(0.5, color="gray", ls="--", lw=.8, alpha=.6)
+                        ax3.barh(FEAT_NAMES, fv3, color=bc3, edgecolor="white", height=.6)
+                        ax3.axvline(0.5, color="gray", ls="--", lw=.8, alpha=.55)
                         ax3.set_xlim(0, 1.15)
-                        ax3.set_xlabel("Diem dac trung (0-1)")
+                        ax3.set_xlabel("Feature score (0–1)")
                         for sp in ["top", "right"]:
                             ax3.spines[sp].set_visible(False)
                         plt.tight_layout()
                         st.pyplot(fig3)
                         plt.close(fig3)
 
-                        # AI reasoning neu co
                         rsn = r.get("_reasoning", {})
                         if rsn and "note" not in rsn:
-                            st.markdown("**Phan tich AI:**")
+                            st.markdown("**AI reasoning:**")
                             for k, v in list(rsn.items())[:4]:
                                 if isinstance(v, str):
                                     st.markdown(f"- **{k}**: {v}")
 
             with rt4:
                 if n >= 1:
-                    w = ranked[0]
+                    top = ranked[0]
                     st.markdown(
-                        f'<div style="text-align:center;padding:18px 0 10px">'
-                        f'<div class="kpi" style="font-size:2.4rem;'
-                        f'color:{w["tier_color"]}">{w["Ung vien"]}</div>'
-                        f'<div style="font-size:.95rem;color:{MUT};margin-top:5px">'
-                        f'Ung vien xuat sac nhat  --  {w["Verdict"]}'
+                        f'<div style="text-align:center;padding:22px 0 14px">'
+                        f'<div class="kpi" style="font-size:2.5rem;'
+                        f'color:{top["tier_color"]}">{top["Candidate"]}</div>'
+                        f'<div style="font-size:.95rem;color:{MUT};margin-top:6px">'
+                        f'Top candidate &nbsp;|&nbsp; {top["Verdict"]}'
                         f'</div></div>',
                         unsafe_allow_html=True,
                     )
-                    wa, wb, wc = st.columns(3)
-                    wa.metric("Diem cuoi",       f"{w['Diem cuoi']:.1f} / 100")
-                    wb.metric("Mo hinh AI",      f"{w['Diem mo hinh']:.1f}%")
-                    wc.metric("Phu hop tieu chi",f"{w['Phu hop tieu chi']:.1f}%")
+                    ta, tb, tc = st.columns(3)
+                    ta.metric("Final Score",    f"{top['Final Score']:.1f} / 100")
+                    tb.metric("Model Score",    f"{top['Model Score']:.1f}%")
+                    tc.metric("Criteria Match", f"{top['Criteria Match']:.1f}%")
 
-                    fv  = [w.get(f, 0) for f in FEAT_COLS]
-                    bc  = [GOOD if v >= 0.65 else WARN if v >= 0.4 else BAD
-                           for v in fv]
+                    fvt = [top.get(f, 0) for f in FEAT_COLS]
+                    bct = [GOOD if v >= 0.65 else WARN if v >= 0.4 else BAD for v in fvt]
                     fig4, ax4 = plt.subplots(figsize=(9, 3.6))
-                    bars = ax4.bar(FEAT_NAMES, fv, color=bc, edgecolor="white")
+                    bars4 = ax4.bar(FEAT_NAMES, fvt, color=bct, edgecolor="white")
                     ax4.axhline(0.5, color="gray", ls="--", lw=1, alpha=.5)
-                    ax4.set_ylim(0, 1.15)
-                    for bar, val in zip(bars, fv):
+                    ax4.set_ylim(0, 1.18)
+                    for bar, val in zip(bars4, fvt):
                         ax4.text(bar.get_x() + bar.get_width() / 2, val + 0.02,
                                  f"{val:.2f}", ha="center", va="bottom",
                                  fontsize=8, fontweight="bold")
-                    ax4.set_ylabel("Diem dac trung (0-1)")
-                    ax4.set_title(f"Profile nang luc -- {w['Ung vien']}",
+                    ax4.set_ylabel("Feature score (0–1)")
+                    ax4.set_title(f"Competency Profile -- {top['Candidate']}",
                                   fontweight="bold", color=INK)
                     for sp in ["top", "right"]:
                         ax4.spines[sp].set_visible(False)
@@ -1026,145 +1004,133 @@ if role.startswith("Recruiter"):
                     st.pyplot(fig4)
                     plt.close(fig4)
 
-            # Download ket qua
+            # Download CSV
             st.markdown("")
-            dl_df = pd.DataFrame(ranked)[[
-                "rank", "Ung vien", "Diem cuoi", "Diem mo hinh",
-                "Phu hop tieu chi", "Verdict",
-            ] + FEAT_COLS]
+            dl_cols = ["rank", "Candidate", "Final Score", "Model Score",
+                       "Criteria Match", "Verdict"] + FEAT_COLS
+            dl_df   = pd.DataFrame(ranked)[[c for c in dl_cols if c in pd.DataFrame(ranked).columns]]
             st.download_button(
-                "Tai ket qua (CSV)",
+                "Download results (CSV)",
                 data=dl_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-                file_name=f"faircv_{job_title.replace(' ','_')}.csv",
+                file_name=f"faircv_{job_title.replace(' ', '_')}.csv",
                 mime="text/csv",
             )
 
     # -------------------------------------------------------------------
-    # Tab 2: Fairness Audit tren FairCVdb test set
+    # Tab 2: Fairness Audit (on FairCVdb held-out test set)
     # -------------------------------------------------------------------
     with tab_fair:
         st.markdown(
-            "Chi so fairness duoc tinh tren **4 800 ho so test** cua FairCVdb "
-            "(du lieu that, tap test giu lai khi huan luyen).  "
-            "Day la bao chung kien minh mo hinh hanh xu cong bang nhu the nao "
-            "tren tap du lieu co kiem soat -- doc lap voi cac CV ban vua upload."
+            "Fairness metrics below are computed on the **4 800 held-out test profiles** "
+            "from FairCVdb -- data the model never saw during training.  "
+            "These figures certify how equitably the trained models behave across "
+            "gender and ethnicity groups, independently of the CVs you just uploaded."
         )
 
-        if not DEMO_MODE:
+        if DEMO_MODE:
+            st.warning(
+                "Demo mode: models trained on synthetic data.  "
+                "Fairness figures are not statistically meaningful.  "
+                "Place `FairCVdb.csv` in `data/` and run `python models/train_models.py`."
+            )
+        else:
             lrm  = cfg.get("lr_metrics",  {})
             mlpm = cfg.get("mlp_metrics", {})
 
-            st.markdown('<div class="sec">So sanh LR vs MLP (Setting A, blind label)</div>',
+            st.markdown('<div class="sec">LR vs MLP -- Setting A, Blind Label</div>',
                         unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1:
+            fa, fb = st.columns(2)
+            with fa:
                 st.markdown("**Logistic Regression**")
                 st.markdown(
-                    f"| Chi so | Gia tri |\n|---|---|\n"
+                    f"| Metric | Value |\n|---|---|\n"
                     f"| F1 | **{lrm.get('F1',0):.4f}** |\n"
                     f"| ROC-AUC | **{lrm.get('ROC-AUC',0):.4f}** |\n"
+                    f"| Accuracy | **{lrm.get('Accuracy',0):.4f}** |\n"
                     f"| DP Gap (gender) | **{lrm.get('DP_Gap_Gender',0):.4f}** |\n"
-                    f"| EOO Gap (gender)| **{lrm.get('EOO_Gap_Gender',0):.4f}** |\n"
-                    f"| DP Gap (ethnicity)| **{lrm.get('DP_Gap_Ethnicity',0):.4f}** |"
+                    f"| EOO Gap (gender) | **{lrm.get('EOO_Gap_Gender',0):.4f}** |\n"
+                    f"| DP Gap (ethnicity) | **{lrm.get('DP_Gap_Ethnicity',0):.4f}** |"
                 )
-            with c2:
-                st.markdown("**MLP (Neural Network)**")
+            with fb:
+                st.markdown("**MLP Neural Network**")
                 st.markdown(
-                    f"| Chi so | Gia tri |\n|---|---|\n"
+                    f"| Metric | Value |\n|---|---|\n"
                     f"| F1 | **{mlpm.get('F1',0):.4f}** |\n"
                     f"| ROC-AUC | **{mlpm.get('ROC-AUC',0):.4f}** |\n"
+                    f"| Accuracy | **{mlpm.get('Accuracy',0):.4f}** |\n"
                     f"| DP Gap (gender) | **{mlpm.get('DP_Gap_Gender',0):.4f}** |\n"
-                    f"| EOO Gap (gender)| **{mlpm.get('EOO_Gap_Gender',0):.4f}** |\n"
-                    f"| DP Gap (ethnicity)| **{mlpm.get('DP_Gap_Ethnicity',0):.4f}** |"
+                    f"| EOO Gap (gender) | **{mlpm.get('EOO_Gap_Gender',0):.4f}** |\n"
+                    f"| DP Gap (ethnicity) | **{mlpm.get('DP_Gap_Ethnicity',0):.4f}** |"
                 )
 
-            # Giai thich chi so
             st.markdown(
                 '<div class="fair-note">'
-                '<b>Giai thich chi so cong bang:</b><br>'
-                '<b>DP Gap</b> (Demographic Parity Gap): '
-                '|P(select|A=1) - P(select|A=0)| -- '
-                'chenh lech ty le duoc chon giua 2 nhom. '
-                'Gap < 0.05 duoc coi la chap nhan duoc.<br>'
-                '<b>EOO Gap</b> (Equal Opportunity Gap): '
-                '|TPR(A=1) - TPR(A=0)| -- chenh lech ty le True Positive.<br>'
-                '<b>Mo hinh da ap dung:</b> '
-                'T1: Loai bo cot gender/ethnicity (Setting A). '
-                'T3: Tai trong so mau (inverse-frequency reweighting).'
+                '<b>Fairness metrics explained:</b><br>'
+                '<b>DP Gap</b> (Demographic Parity Gap) = |P(select|A=1) - P(select|A=0)| '
+                '-- selection rate gap between groups.  Values below 0.05 are generally acceptable.<br>'
+                '<b>EOO Gap</b> (Equal Opportunity Gap) = |TPR(A=1) - TPR(A=0)| '
+                '-- true-positive-rate gap between groups.<br>'
+                '<b>Mitigations applied:</b> '
+                'T1: gender/ethnicity columns removed (Setting A). '
+                'T3: inverse-frequency sample reweighting during training.'
                 '</div>',
                 unsafe_allow_html=True,
             )
-        else:
-            st.warning(
-                "Dang o che do demo (mo hinh tren du lieu mo phong). "
-                "Chi so fairness tren du lieu nay khong co y nghia thong ke. "
-                "Dat FairCVdb.csv that va chay lai train_models.py."
-            )
 
     # -------------------------------------------------------------------
-    # Tab 3: SHAP -- Giai thich AI
+    # Tab 3: SHAP -- XAI Explanations
     # -------------------------------------------------------------------
     with tab_shap:
         st.markdown(
-            "Bieu do SHAP cho biet **dac trung nao co anh huong lon nhat** "
-            "den quyet dinh cua mo hinh AI, giup HR hieu va kiem soat "
-            "tieu chi cham diem mot cach minh bach."
+            "SHAP values reveal **which features drive the AI model's decisions** "
+            "most strongly, enabling transparent auditing of the scoring logic."
         )
 
         if "ranked" not in st.session_state:
-            st.info("Upload va cham diem ho so o tab 'Sang loc CV' truoc.")
+            st.info("Please upload and evaluate CVs in the 'CV Screening' tab first.")
         else:
-            ranked_shap = st.session_state["ranked"]
+            ranked_s = st.session_state["ranked"]
+
+            # Build feature matrix from scored candidates
+            X_cands = np.array([
+                [float(r.get(f, 0.5)) for f in FEAT_COLS]
+                for r in ranked_s
+            ])
+
+            # Select scaler matching current model choice
+            scaler_s = mlp_scaler if model_choice.startswith("MLP") else lr_scaler
+            model_s  = mlp_model  if model_choice.startswith("MLP") else lr_model
+            X_scaled = scaler_s.transform(X_cands)
 
             try:
                 import shap
 
-                # Chon mo hinh de giai thich
-                if model_choice.startswith("MLP"):
-                    model_shap  = mlp_model
-                    scaler_shap = mlp_scaler
-                else:
-                    model_shap  = lr_model
-                    scaler_shap = lr_scaler
-
-                # Xay dung ma tran dac trung cua cac ung vien da cham diem
-                X_cands = np.array([
-                    [float(r.get(f, 0.5)) for f in FEAT_COLS]
-                    for r in ranked_shap
-                ])
-                X_scaled_shap = scaler_shap.transform(X_cands)
-
-                # Tinh SHAP values
+                # LinearExplainer for LR; KernelExplainer fallback for MLP
                 try:
-                    explainer  = shap.LinearExplainer(
-                        model_shap, X_scaled_shap,
+                    explainer = shap.LinearExplainer(
+                        model_s, X_scaled,
                         feature_perturbation="interventional",
                     )
-                    shap_vals  = explainer.shap_values(X_scaled_shap)
+                    sv = explainer.shap_values(X_scaled)
                 except Exception:
-                    # Fallback sang KernelExplainer
-                    explainer  = shap.KernelExplainer(
-                        lambda x: model_shap.predict_proba(x)[:, 1],
-                        shap.sample(X_scaled_shap, min(50, len(X_scaled_shap))),
+                    bg = shap.sample(X_scaled, min(50, len(X_scaled)))
+                    explainer = shap.KernelExplainer(
+                        lambda x: model_s.predict_proba(x)[:, 1], bg
                     )
-                    shap_vals  = explainer.shap_values(
-                        X_scaled_shap, nsamples=100,
-                    )
+                    sv = explainer.shap_values(X_scaled, nsamples=100)
 
-                # -- Bieu do Feature Importance tong the ---------------
-                mean_abs = np.abs(shap_vals).mean(axis=0)
+                # -- Global Feature Importance bar chart ----------------
+                st.markdown('<div class="sec">Global Feature Importance (Mean |SHAP|)</div>',
+                            unsafe_allow_html=True)
+                mean_abs = np.abs(sv).mean(axis=0)
                 order    = np.argsort(mean_abs)
 
                 fig_s, ax_s = plt.subplots(figsize=(8, 4))
-                ax_s.barh(
-                    [FEAT_NAMES[i] for i in order],
-                    mean_abs[order],
-                    color=COMP, edgecolor="white",
-                )
+                ax_s.barh([FEAT_NAMES[i] for i in order], mean_abs[order],
+                          color=COMP, edgecolor="white")
                 ax_s.set_xlabel("Mean |SHAP value|")
                 ax_s.set_title(
-                    f"Do quan trong dac trung ({model_choice.split()[0]}) "
-                    "-- SHAP Feature Importance",
+                    f"Feature Importance ({model_choice.split()[0]}) -- SHAP",
                     fontweight="bold", color=INK,
                 )
                 for sp in ["top", "right"]:
@@ -1173,47 +1139,56 @@ if role.startswith("Recruiter"):
                 st.pyplot(fig_s)
                 plt.close(fig_s)
 
-                # -- Bieu do SHAP dot plot (ung vien vs dac trung) ------
-                st.markdown("**SHAP co dong gop tung dac trung -- moi diem = 1 ung vien**")
-                fig_b, ax_b = plt.subplots(figsize=(9, 4))
+                st.dataframe(
+                    pd.DataFrame({
+                        "Feature":      [FEAT_NAMES[i] for i in order[::-1]],
+                        "Mean |SHAP|":  [round(mean_abs[i], 5) for i in order[::-1]],
+                    }),
+                    use_container_width=True, hide_index=True,
+                )
+
+                # -- SHAP dot plot (each dot = one candidate) -----------
+                st.markdown('<div class="sec">SHAP Contribution Distribution</div>',
+                            unsafe_allow_html=True)
+                st.caption("Each dot = one candidate.  "
+                           "Colour = feature score level.  "
+                           "x-axis position = direction and magnitude of influence on the decision.")
+
+                fig_d, ax_d = plt.subplots(figsize=(9, 4))
                 for j, fname in enumerate(FEAT_NAMES):
-                    vals   = shap_vals[:, j]
+                    vals   = sv[:, j]
                     scores = X_cands[:, j]
-                    colors = [GOOD if s >= 0.6 else WARN if s >= 0.4 else BAD
-                              for s in scores]
-                    ax_b.scatter(vals, [j] * len(vals),
-                                 c=colors, alpha=0.7, s=40, edgecolors="white")
-                ax_b.set_yticks(range(len(FEAT_NAMES)))
-                ax_b.set_yticklabels(FEAT_NAMES, fontsize=9)
-                ax_b.axvline(0, color="gray", lw=0.8)
-                ax_b.set_xlabel("SHAP value (anh huong den diem)")
-                ax_b.set_title("Phan bo dong gop SHAP theo dac trung",
+                    cols   = [GOOD if s >= 0.6 else WARN if s >= 0.4 else BAD for s in scores]
+                    ax_d.scatter(vals, [j] * len(vals), c=cols,
+                                 alpha=0.75, s=45, edgecolors="white", linewidths=.4)
+                ax_d.set_yticks(range(len(FEAT_NAMES)))
+                ax_d.set_yticklabels(FEAT_NAMES, fontsize=9)
+                ax_d.axvline(0, color="gray", lw=0.8)
+                ax_d.set_xlabel("SHAP value (impact on model output)")
+                ax_d.set_title("Per-Feature SHAP Distribution Across Candidates",
                                fontweight="bold", color=INK)
-                legend_p = [
-                    mpatches.Patch(color=GOOD, label="Diem cao (>=0.6)"),
-                    mpatches.Patch(color=WARN, label="Diem trung (0.4-0.6)"),
-                    mpatches.Patch(color=BAD,  label="Diem thap (<0.4)"),
+                legend_d = [
+                    mpatches.Patch(color=GOOD, label="High feature score (>=0.6)"),
+                    mpatches.Patch(color=WARN, label="Medium (0.4–0.6)"),
+                    mpatches.Patch(color=BAD,  label="Low (<0.4)"),
                 ]
-                ax_b.legend(handles=legend_p, fontsize=8, loc="lower right")
+                ax_d.legend(handles=legend_d, fontsize=8, loc="lower right")
                 for sp in ["top", "right"]:
-                    ax_b.spines[sp].set_visible(False)
+                    ax_d.spines[sp].set_visible(False)
                 plt.tight_layout()
-                st.pyplot(fig_b)
-                plt.close(fig_b)
+                st.pyplot(fig_d)
+                plt.close(fig_d)
 
             except ImportError:
-                # Fallback: ve bieu do trong so mo hinh (feature coefficients)
-                st.warning("Thu vien `shap` chua duoc cai. Hien thi Feature Importance thay the.")
+                # Graceful fallback: show LR coefficients as a proxy
+                st.warning("`shap` library not installed.  Showing LR coefficients as a proxy.")
                 if hasattr(lr_model, "coef_"):
                     coefs = np.abs(lr_model.coef_.ravel())
                     order = np.argsort(coefs)
                     fig_fb, ax_fb = plt.subplots(figsize=(8, 4))
-                    ax_fb.barh(
-                        [FEAT_NAMES[i] for i in order],
-                        coefs[order],
-                        color=COMP, edgecolor="white",
-                    )
-                    ax_fb.set_xlabel("|He so LR| (proxy cho do quan trong)")
+                    ax_fb.barh([FEAT_NAMES[i] for i in order], coefs[order],
+                               color=COMP, edgecolor="white")
+                    ax_fb.set_xlabel("|LR coefficient| (proxy for importance)")
                     ax_fb.set_title("Feature Importance (LR coefficients)",
                                     fontweight="bold", color=INK)
                     for sp in ["top", "right"]:
@@ -1222,7 +1197,7 @@ if role.startswith("Recruiter"):
                     st.pyplot(fig_fb)
                     plt.close(fig_fb)
                 else:
-                    st.info("Cai shap de xem bieu do: pip install shap")
+                    st.info("Install shap for full XAI support:  `pip install shap`")
 
 
 # ===========================================================================
@@ -1232,98 +1207,121 @@ if role.startswith("Recruiter"):
 else:
     st.markdown(
         '<div class="hero">'
-        '<h1>Candidate -- Bao cao fairness ca nhan</h1>'
-        '<p>Upload CV cua ban, xem diem duoc cham nhu the nao, '
-        'dac trung nao anh huong ket qua va danh gia muc do cong bang.</p>'
+        '<h1>Candidate -- Your Personal Fairness Report Card</h1>'
+        '<p>Upload your CV (one PDF file), see how it is scored, '
+        'which features drive the decision, and whether the outcome '
+        'is based fairly on your competencies.</p>'
         '</div>',
         unsafe_allow_html=True,
     )
 
-    # Thong tin vi tri ung tuyen
-    st.markdown('<div class="sec">Vi tri ban ung tuyen</div>', unsafe_allow_html=True)
-    ca, cb = st.columns(2)
-    with ca:
-        cand_job    = st.text_input("Vi tri", "Data Analyst")
-    with cb:
+    # Target position
+    st.markdown('<div class="sec">Target Position</div>', unsafe_allow_html=True)
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        cand_job    = st.text_input("Position you are applying for", "Data Analyst")
+    with pc2:
         cand_domain = st.selectbox(
-            "Linh vuc", ["IT / Cong nghe", "Marketing",
-                         "Tai chinh / Ke toan", "Nhan su / HR", "Khac"]
+            "Industry domain",
+            ["IT / Technology", "Marketing", "Finance / Accounting",
+             "Human Resources", "Other"],
         )
     cand_desc = st.text_area(
-        "Yeu cau thuong gap",
-        "Python, SQL, phan tich du lieu, 2+ nam kinh nghiem", height=65,
+        "Typical requirements for this role",
+        "Python, SQL, data analysis, 2+ years of experience",
+        height=68,
     )
 
-    # Upload CV
-    st.markdown('<div class="sec">Upload CV cua ban (PDF)</div>', unsafe_allow_html=True)
-    cand_file = st.file_uploader("Chon file PDF", type=["pdf"])
+    # Single PDF upload
+    st.markdown('<div class="sec">Upload Your CV</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="upload-hint">'
+        '<b>Format:</b> PDF only &nbsp;|&nbsp; '
+        '<b>Single file</b> -- your own CV &nbsp;|&nbsp; '
+        'File content is never stored; it is processed in-memory for this session only.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
-    if cand_file and st.button("Phan tich CV cua toi", type="primary"):
-        with st.spinner("Dang phan tich..."):
-            # Doc PDF
-            try:
-                from pdfminer.high_level import extract_text as _pdf_text
-                raw = cand_file.read()
-                cv_text = _pdf_text(io.BytesIO(raw))
-            except ImportError:
-                cand_file.seek(0)
-                cv_text = cand_file.read().decode("utf-8", errors="ignore")
+    cand_pdf = st.file_uploader(
+        "Select your CV (PDF)",
+        type=["pdf"],
+        accept_multiple_files=False,   # Candidate: one file only
+        key="candidate_upload",
+        help="Upload your own CV as a single PDF file.",
+    )
 
-            cv_text = re.sub(r"\n{3,}", "\n\n", cv_text).strip()
+    if cand_pdf:
+        st.caption(f"Selected: **{cand_pdf.name}**  ({cand_pdf.size:,} bytes)")
 
-            if len(cv_text) < 40:
-                st.error("Khong doc duoc noi dung CV. Vui long kiem tra file PDF.")
+    analyse_btn = st.button(
+        "Analyse My CV",
+        type="primary",
+        disabled=(cand_pdf is None),
+    )
+
+    if analyse_btn and cand_pdf is not None:
+        with st.spinner("Analysing your CV..."):
+            cv_text = _read_pdf(cand_pdf)
+
+            if len(cv_text.strip()) < 50:
+                st.error(
+                    "Could not extract text from this PDF.  "
+                    "Make sure the file is not scanned/image-only."
+                )
                 st.stop()
 
             cand_w = {c: 1.0 / len(FEAT_COLS) for c in FEAT_COLS}
-            feats  = extract_features(
-                cv_text, cand_job, cand_desc, cand_domain, use_claude_cand
-            )
-            cand_name = feats.pop("candidate_name", "Ban")
+            feats  = extract_features(cv_text, cand_job, cand_desc, cand_domain, use_claude)
+            name      = feats.pop("candidate_name", "You")
             reasoning = feats.pop("reasoning", {})
             gender_px = feats.pop("Gender_Proxy", 0.5)
             scores    = score_candidate(feats, cand_w, model_choice)
-            st.session_state["cand"] = {
-                "name": cand_name, "feats": feats,
-                "scores": scores, "reasoning": reasoning,
+
+            st.session_state["cand_result"] = {
+                "name":         name,
+                "feats":        feats,
+                "scores":       scores,
+                "reasoning":    reasoning,
                 "gender_proxy": gender_px,
             }
 
-    if "cand" in st.session_state:
-        cr = st.session_state["cand"]
+    if "cand_result" in st.session_state:
+        cr = st.session_state["cand_result"]
         sc = cr["scores"]
         ft = cr["feats"]
 
-        # -- Ket qua chinh --
-        st.markdown('<div class="sec">Ket qua danh gia</div>', unsafe_allow_html=True)
+        # -- Decision result --------------------------------------------
+        st.markdown('<div class="sec">Your Result</div>', unsafe_allow_html=True)
         dec_color = GOOD if sc["verdict"] == "Recommended" else BAD
-        dec_label = "DUOC KHUYEN NGHI" if sc["verdict"] == "Recommended" else "CHUA DUOC khuyen nghi"
+        dec_label = "RECOMMENDED" if sc["verdict"] == "Recommended" else "NOT RECOMMENDED"
 
-        d1, d2, d3 = st.columns(3)
-        d1.markdown(
-            _card("Quyet dinh", dec_label, dec_color,
-                  f"Diem: {sc['final_score']:.1f} / 100"),
+        dr1, dr2, dr3 = st.columns(3)
+        dr1.markdown(
+            _card("Decision", dec_label, dec_color,
+                  f"Final score: {sc['final_score']:.1f} / 100"),
             unsafe_allow_html=True,
         )
-        d2.metric("Diem mo hinh AI",   f"{sc['model_score']:.1f}%")
-        d3.metric("Phu hop tieu chi",  f"{sc['criteria_score']:.1f}%")
+        dr2.metric("AI Model Score",   f"{sc['model_score']:.1f}%")
+        dr3.metric("Criteria Match",   f"{sc['criteria_score']:.1f}%")
 
-        # -- Profile dac trung --
-        st.markdown('<div class="sec">Profile nang luc cua ban</div>',
+        # -- Competency profile bar chart -------------------------------
+        st.markdown('<div class="sec">Your Competency Profile</div>',
                     unsafe_allow_html=True)
+
         fv = [ft.get(f, 0) for f in FEAT_COLS]
         bc = [GOOD if v >= 0.65 else WARN if v >= 0.4 else BAD for v in fv]
 
         fig_c, ax_c = plt.subplots(figsize=(9, 3.6))
-        bars_c = ax_c.barh(FEAT_NAMES, fv, color=bc, edgecolor="white", height=.6)
-        ax_c.axvline(0.5, color="gray", ls="--", lw=.9, alpha=.5, label="Nguong trung binh")
-        ax_c.set_xlim(0, 1.15)
-        ax_c.set_xlabel("Diem dac trung (0-1)")
-        ax_c.set_title(f"Profile nang luc -- {cr['name']}", fontweight="bold", color=INK)
+        ax_c.barh(FEAT_NAMES, fv, color=bc, edgecolor="white", height=.62)
+        ax_c.axvline(0.5, color="gray", ls="--", lw=.9, alpha=.5)
+        ax_c.set_xlim(0, 1.16)
+        ax_c.set_xlabel("Feature score (0–1)")
+        ax_c.set_title(f"Competency Profile -- {cr['name']}", fontweight="bold", color=INK)
         legend_c = [
-            mpatches.Patch(color=GOOD, label="Manh (>=0.65)"),
-            mpatches.Patch(color=WARN, label="Trung binh (0.4-0.65)"),
-            mpatches.Patch(color=BAD,  label="Can cai thien (<0.4)"),
+            mpatches.Patch(color=GOOD, label="Strong (>= 0.65)"),
+            mpatches.Patch(color=WARN, label="Moderate (0.40 – 0.65)"),
+            mpatches.Patch(color=BAD,  label="Needs improvement (< 0.40)"),
         ]
         ax_c.legend(handles=legend_c, fontsize=8, loc="lower right")
         for sp in ["top", "right"]:
@@ -1332,74 +1330,80 @@ else:
         st.pyplot(fig_c)
         plt.close(fig_c)
 
-        # -- Phan tich AI --
+        # -- Per-feature AI reasoning -----------------------------------
         rsn = cr.get("reasoning", {})
         if rsn and "note" not in rsn:
-            st.markdown('<div class="sec">Phan tich AI theo tung tieu chi</div>',
+            st.markdown('<div class="sec">AI Reasoning per Feature</div>',
                         unsafe_allow_html=True)
             for k, v in rsn.items():
                 if isinstance(v, str):
                     val   = ft.get(k, 0.5)
-                    icon  = "✓" if val >= 0.65 else ("!" if val >= 0.4 else "x")
+                    icon  = "✓" if val >= 0.65 else ("~" if val >= 0.4 else "x")
                     color = GOOD if val >= 0.65 else (WARN if val >= 0.4 else BAD)
                     st.markdown(
-                        f'<span style="color:{color};font-weight:700">{icon}</span> '
+                        f'<span style="color:{color};font-weight:700">[{icon}]</span> '
                         f'**{k}** ({val:.2f}): {v}',
                         unsafe_allow_html=True,
                     )
 
-        # -- Fairness verdict --
-        st.markdown('<div class="sec">Danh gia cong bang</div>', unsafe_allow_html=True)
+        # -- Fairness assessment ----------------------------------------
+        st.markdown('<div class="sec">Fairness Assessment</div>', unsafe_allow_html=True)
 
         gp = cr.get("gender_proxy", 0.5)
         if gp in (0.0, 1.0):
-            group_name = "Nu" if gp == 1.0 else "Nam"
+            group = "Female" if gp == 1.0 else "Male"
             st.markdown(
-                f'<div class="verdict-warn">'
-                f'Ho so co tu ngu chi gioi tinh ({group_name}) duoc phat hien.  '
-                f'Mo hinh FairCV <b>khong dung thong tin nay</b> de cham diem '
-                f'(Gender_Proxy khong nam trong FEAT_COLS).  '
-                f'Tuy nhien, nen luu y rang nha tuyen dung con nguoi co the '
-                f'bi anh huong boi thong tin nay khi doc CV thu cong.'
+                f'<div class="v-warn">'
+                f'Gender-indicating language ({group}) was detected in your CV.  '
+                f'The FairCV model does <b>not</b> use this information for scoring '
+                f'(Gender_Proxy is excluded from all model features).  '
+                f'However, human reviewers reading the CV directly may be influenced '
+                f'by this language.'
                 f'</div>',
                 unsafe_allow_html=True,
             )
         elif not DEMO_MODE:
             mlpm = cfg.get("mlp_metrics", {})
-            dp_g = mlpm.get("DP_Gap_Gender", 0.0)
+            dp_g = float(mlpm.get("DP_Gap_Gender", 0.0))
             if dp_g < 0.02:
                 st.markdown(
-                    f'<div class="verdict-clear">'
-                    f'Mo hinh MLP co DP Gap gioi tinh = {dp_g:.4f} '
-                    f'(rat thap, dat tieu chuan cong bang).  '
-                    f'Ket qua danh gia cua ban dua tren nang luc thuan tuy.'
+                    f'<div class="v-clear">'
+                    f'The MLP model has a gender DP Gap of {dp_g:.4f} on the FairCVdb '
+                    f'test set -- well within the acceptable range (< 0.05).  '
+                    f'Your result is based on your competency profile only.'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
-                    f'<div class="verdict-warn">'
-                    f'DP Gap gioi tinh = {dp_g:.4f} -- con chech lech giua cac nhom.  '
-                    f'He thong dang ap dung Technique T3 (reweighting) '
-                    f'de giam thieu phan biet doi xu.'
+                    f'<div class="v-warn">'
+                    f'Gender DP Gap = {dp_g:.4f} on the test set -- '
+                    f'some disparity remains between demographic groups.  '
+                    f'Sample reweighting (T3) has been applied to minimise this.'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
+        else:
+            st.info("Fairness assessment requires production models trained on FairCVdb.")
 
-        with st.expander("Hieu them ve cach tinh diem cua ban", expanded=False):
+        # -- How your score is calculated (expandable) ------------------
+        with st.expander("How your score is calculated", expanded=False):
             st.markdown(
-                "**Trich xuat dac trung:** Van ban CV duoc phan tich de cho diem "
-                "8 tieu chi nang luc (0.0 - 1.0), khop voi cau truc du lieu FairCVdb.  "
-                "Claude API (neu co) hoac quy tac heuristic duoc dung cho buoc nay.\n\n"
-                "**Cham diem:** Mo hinh da huan luyen tren 19 200 ho so FairCVdb that "
-                "(80% tap huan luyen) du doan xac suat 'Recommended'.  "
-                "Diem cuoi = 60% diem mo hinh + 40% phu hop tieu chi nha tuyen dung.\n\n"
-                "**Bao dam cong bang:**\n"
-                "- Gender va ethnicity KHONG co trong dac trung dau vao mo hinh.\n"
-                "- Mo hinh duoc huan luyen tren blind_label (khong biet gioi tinh).\n"
-                "- Sample reweighting giam chech lech giua cac nhom dan so.\n"
-                "- 'Recommendation' bi loai tru de tranh bias mang luoi quan he."
+                "**Feature extraction:** Your CV text is parsed into 8 structured "
+                "competency scores (0.0 – 1.0) matching the FairCVdb schema.  "
+                "Claude API is used for extraction when a key is configured; "
+                "otherwise a rule-based heuristic is applied.\n\n"
+                "**Model scoring:** Two models trained on 19 200 FairCVdb profiles "
+                "(blind label -- gender and ethnicity never used in training) "
+                "each predict the probability of a 'Recommended' outcome.  "
+                "Final score = 60% model probability + 40% criteria match.\n\n"
+                "**Fairness guarantees applied:**\n"
+                "- Gender and ethnicity are absent from all model input features (Setting A).\n"
+                "- Models are trained on the blind label (unaware of protected attributes).\n"
+                "- Sample reweighting (T3) reduces inter-group imbalance during training.\n"
+                "- 'Recommendation' feature excluded to prevent referral-network bias."
             )
+
 
 # ---------------------------------------------------------------------------
 # Footer
@@ -1407,7 +1411,8 @@ else:
 
 st.markdown("---")
 st.caption(
-    "FairCV v1.0 -- He thong sang loc CV cong bang. "
-    "Mo hinh huan luyen tren FairCVdb (Complement et al., CVPRW 2020). "
-    "Du lieu CV khong duoc luu tru -- chi dung trong phien lam viec hien tai."
+    "FairCV v1.0  --  Fair Recruitment Scoring System.  "
+    "Models trained on FairCVdb (Complement et al., CVPRW 2020).  "
+    "CV data is processed in-memory and never stored."
 )
+

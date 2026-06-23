@@ -11,6 +11,9 @@ Two roles share the same session:
       3. Upload multiple candidate CVs as individual PDF files (>= 1, no ZIP).
       4. Choose AI model: Logistic Regression or MLP.
       5. View ranked results Top 10/5/3/1, SHAP charts, fairness audit.
+      6. AI Summary -- Gemini generates a pool overview + Top-3 shortlist rationale.
+      7. Chatbot -- ask Gemini any question about a candidate's score or fairness.
+      8. Human-in-the-loop final decision by recruiter.
 
   Candidate
       1. Enter the target position they are applying for.
@@ -19,6 +22,11 @@ Two roles share the same session:
 
 Run:
     streamlit run app/streamlit_app.py
+
+Optional -- Gemini API key:
+    Set GEMINI_API_KEY in Streamlit Secrets (recommended) or enter in the sidebar.
+    Free key at: https://aistudio.google.com/apikey
+    If no key is provided, LLM Summary and Chatbot tabs are disabled gracefully.
 """
 from __future__ import annotations
 
@@ -1415,4 +1423,3 @@ st.caption(
     "Models trained on FairCVdb (Complement et al., CVPRW 2020).  "
     "CV data is processed in-memory and never stored."
 )
-
